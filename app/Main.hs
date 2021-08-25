@@ -130,14 +130,14 @@ repl args = do
                        b <- lift $ catchErrors $ handleCommand c
                        maybe loop (`when` loop) b
 
-compileFiles ::  MonadPCF m => [String] -> m ()
+compileFiles ::  MonadPCF m => [FilePath] -> m ()
 compileFiles []     = return ()
 compileFiles (x:xs) = do
         modify (\s -> s { lfile = x, inter = False })
         compileFile x
         compileFiles xs
 
-loadFile ::  MonadPCF m => String -> m [Decl NTerm]
+loadFile ::  MonadPCF m => FilePath -> m [Decl NTerm]
 loadFile f = do
     let filename = reverse(dropWhile isSpace (reverse f))
     x <- liftIO $ catch (readFile filename)
@@ -147,7 +147,7 @@ loadFile f = do
     setLastFile filename
     parseIO filename program x
 
-compileFile ::  MonadPCF m => String -> m ()
+compileFile ::  MonadPCF m => FilePath -> m ()
 compileFile f = do
     printPCF ("Abriendo "++f++"...")
     let filename = reverse(dropWhile isSpace (reverse f))
@@ -178,6 +178,7 @@ handleDecl (Decl p x t) = do
 data Command = Compile CompileForm
              | PPrint String
              | Type String
+             | Reload
              | Browse
              | Quit
              | Help
@@ -214,6 +215,7 @@ commands
        Cmd [":load"]        "<file>"  (Compile . CompileFile)
                                                      "Cargar un programa desde un archivo",
        Cmd [":print"]       "<exp>"   PPrint          "Imprime un término y sus ASTs sin evaluarlo",
+       Cmd [":reload"]      ""        (const Reload)         "Vuelve a cargar el último archivo cargado",
        Cmd [":type"]        "<exp>"   Type           "Chequea el tipo de una expresión",
        Cmd [":quit",":Q"]        ""        (const Quit)   "Salir del intérprete",
        Cmd [":help",":?"]   ""        (const Help)   "Mostrar esta lista de comandos" ]
@@ -242,8 +244,9 @@ handleCommand cmd = do
        Compile c ->
                   do  case c of
                           CompileInteractive e -> compilePhrase e
-                          CompileFile f        -> put (s {lfile=f}) >> compileFile f
+                          CompileFile f        -> put (s {lfile=f, cantDecl=0}) >> compileFile f
                       return True
+       Reload ->  eraseLastFileDecls >> (getLastFile >>= compileFile) >> return True
        PPrint e   -> printPhrase e >> return True
        Type e    -> typeCheckPhrase e >> return True
 
