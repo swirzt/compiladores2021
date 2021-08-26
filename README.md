@@ -22,3 +22,22 @@ stack ghci
 
 stack ghci src/TypeChecker.hs
 ```
+
+También se pueden cargar archivos. Desde stack:
+```code
+stack run -- miprograma.fd4
+```
+
+En general, los argumentos a nuestro programa se escriben luego de `--`. Por ejemplo,
+```code
+% stack run -- --help
+Compilador de FD4 de la materia Compiladores 2021
+
+Usage: compiladores-exe [(-t|--typecheck) | (-i|--interactive)] [FILES...]
+  Compilador de FD4
+
+Available options:
+  -t,--typecheck           Solo chequear tipos
+  -i,--interactive         Ejecutar en forma interactiva
+  -h,--help                Show this help text
+```
