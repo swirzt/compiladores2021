@@ -33,7 +33,7 @@ import Lang
 import Parse ( P, tm, program, declOrTm, runP )
 import Elab ( elab )
 import Eval ( eval )
-import PPrint ( pp , ppTy )
+import PPrint ( pp , ppTy, ppDecl )
 import MonadPCF
 import TypeChecker ( tc, tcDecl )
 
@@ -87,8 +87,8 @@ main = execParser opts >>= go
     go (Interactive,_,files) = 
               do runPCF (runInputT defaultSettings (repl files))
                  return ()
-    go (Typecheck,_, files) =
-              runOrFail $ mapM_ typecheckFile files
+    go (Typecheck,opt, files) =
+              runOrFail $ mapM_ (typecheckFile opt) files
     -- go (InteractiveCEK,_, files) = undefined
     -- go (Bytecompile,_, files) =
     --           runOrFail $ mapM_ bytecompileFile files
@@ -158,20 +158,27 @@ compileFile f = do
     decls <- parseIO filename program x
     mapM_ handleDecl decls
 
-typecheckFile ::  MonadPCF m => FilePath -> m ()
-typecheckFile f = do
+typecheckFile ::  MonadPCF m => Bool -> FilePath -> m ()
+typecheckFile opt f = do
+    printPCF  ("Chequeando "++f)
     decls <- loadFile f
-    mapM_ handleDecl decls
+    ppterms <- mapM (fmap ppDecl . typecheckDecl) decls
+    mapM_ printPCF ppterms
 
 parseIO ::  MonadPCF m => String -> P a -> String -> m a
 parseIO filename p x = case runP p x filename of
                   Left e  -> throwError (ParseErr e)
                   Right r -> return r
 
+typecheckDecl :: MonadPCF m => Decl NTerm -> m (Decl Term)
+typecheckDecl (Decl p x t) = do
+        let dd = (Decl p x (elab t))
+        tcDecl dd
+        return dd
+
 handleDecl ::  MonadPCF m => Decl NTerm -> m ()
-handleDecl (Decl p x t) = do
-        let tt = elab t
-        tcDecl (Decl p x tt)    
+handleDecl d = do
+        (Decl p x tt) <- typecheckDecl d
         te <- eval tt
         addDecl (Decl p x te)
 

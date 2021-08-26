@@ -11,13 +11,14 @@ Stability   : experimental
 module PPrint (
     pp,
     ppTy,
-    ppName
+    ppName,
+    ppDecl
     ) where
 
 import Lang
 import Subst ( openN )
 import Text.PrettyPrint
-    ( (<+>), nest, parens, render, sep, text, Doc )
+    ( (<+>), nest, parens, render, sep, hsep, text, Doc )
 
 -- Como `openN`, pero cambia el nombre si genera shadowing. Nota:
 -- esto es rídiculamente ineficiente si los términos empiezan a ser
@@ -122,7 +123,7 @@ t2doc at (Print _ str t) =
   sep [text "print", text (show str), t2doc True t]
 t2doc at (Let _ v ty m n) =
   parenIf at $
-  sep [text "let",
+  hsep [text "let",
        binding2doc (v,ty),
        text "=",
        t2doc False m,
@@ -146,4 +147,7 @@ pp :: Term -> String
 {- pp = show -}
 pp = render . t2doc False . openAll
 
+-- | Pretty printing de declaraciones
+ppDecl :: Decl Term -> String
+ppDecl (Decl p x t) = render $ hsep [text "let", text (ppName x), text"=", t2doc False (openAll t)]
 
