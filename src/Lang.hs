@@ -80,7 +80,7 @@ getInfo (IfZ i _ _ _     ) = i
 getInfo (Let i _ _ _ _   ) = i
 getInfo (BinaryOp i _ _ _) = i
 
--- | Obtiene los nombres de variables (abiertos o globales) de un término.
+-- | Obtiene los nombres de variables (abiertas o globales) de un término.
 freeVars :: Tm info Var -> [Name]
 freeVars tm = nubSort $ go tm [] where
   go (V _ (Free   v)  ) xs = v : xs

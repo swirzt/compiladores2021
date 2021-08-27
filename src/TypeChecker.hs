@@ -74,7 +74,9 @@ tc (BinaryOp p op t u) bs = do
 typeError :: MonadPCF m => Term   -- ^ término que se está chequeando  
                         -> String -- ^ mensaje de error
                         -> m a
-typeError t s = failPosPCF (getInfo t) $ "Error de tipo en "++pp t++"\n"++s
+typeError t s = do 
+   ppt <- pp t
+   failPosPCF (getInfo t) $ "Error de tipo en "++ppt++"\n"++s
  
 -- | 'expect' chequea que el tipo esperado sea igual al que se obtuvo
 -- y lanza un error si no lo es.

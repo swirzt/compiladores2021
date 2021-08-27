@@ -112,7 +112,7 @@ runOrFail m = do
       exitWith (ExitFailure 1)
     Right v -> return v
 
-repl :: (MonadPCF m, MonadMask m) => [String] -> InputT m ()
+repl :: (MonadPCF m, MonadMask m) => [FilePath] -> InputT m ()
 repl args = do
        lift $ catchErrors $ compileFiles args
        s <- lift get
@@ -162,7 +162,7 @@ typecheckFile ::  MonadPCF m => Bool -> FilePath -> m ()
 typecheckFile opt f = do
     printPCF  ("Chequeando "++f)
     decls <- loadFile f
-    ppterms <- mapM (fmap ppDecl . typecheckDecl) decls
+    ppterms <- mapM (typecheckDecl >=> ppDecl) decls
     mapM_ printPCF ppterms
 
 parseIO ::  MonadPCF m => String -> P a -> String -> m a
@@ -271,7 +271,8 @@ handleTerm t = do
          s <- get
          ty <- tc tt (tyEnv s)
          te <- eval tt
-         printPCF (pp te ++ " : " ++ ppTy ty)
+         ppte <- pp te
+         printPCF (ppte ++ " : " ++ ppTy ty)
 
 printPhrase   :: MonadPCF m => String -> m ()
 printPhrase x =

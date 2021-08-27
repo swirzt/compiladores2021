@@ -16,46 +16,42 @@ module PPrint (
     ) where
 
 import Lang
-import Subst ( openN )
+import Subst ( open, openN )
 import Text.PrettyPrint
     ( (<+>), nest, parens, render, sep, hsep, text, Doc )
+import MonadPCF
+import Global
 
--- Como `openN`, pero cambia el nombre si genera shadowing. Nota:
--- esto es rídiculamente ineficiente si los términos empiezan a ser
--- grandes, porque requiere atravesarlo íntegramente.
-openRename :: [Name] -> Term -> ([Name], Term)
-openRename ns t =
-  let fs = freeVars t in
-  let freshen n = let cands = n : (map (\i -> n ++ show i) [0..]) in
-                  let n' = head (filter (\m -> not (elem m fs)) cands) in
-                  n'
-  in
-  let fresh_ns = map freshen ns in
-  (fresh_ns, openN fresh_ns t)
+freshen :: [Name] -> Name -> Name
+freshen ns n = let cands = n : (map (\i -> n ++ show i) [0..]) 
+               in head (filter (\m -> not (elem m ns)) cands)
 
 -- | 'openAll' convierte términos locally nameless
 -- a términos fully named abriendo todos las variables de ligadura que va encontrando
 -- Debe tener cuidado de no abrir términos con nombres que ya fueron abiertos.
-openAll :: Term -> NTerm
-openAll (V p v) = case v of 
+-- Estos nombres se encuentran en la lista ns (primer argumento).
+openAll :: [Name] -> Term -> NTerm
+openAll ns (V p v) = case v of 
       Bound i ->  V p $ "(Bound "++show i++")" --este caso no debería aparecer
                                                --si el término es localmente cerrado
       Free x -> V p x
       Global x -> V p x
-openAll (Const p c) = Const p c
-openAll (Lam p x ty t) =
-    let ([x'], t') = openRename [x] t 
-    in  Lam p x' ty (openAll t')
-openAll (App p t u) = App p (openAll t) (openAll u)
-openAll (Fix p f fty x xty t) =
-    let ([f', x'], t') = openRename [f, x] t
-    in  Fix p f' fty x' xty (openAll t')
-openAll (IfZ p c t e) = IfZ p (openAll c) (openAll t) (openAll e)
-openAll (Print p str t) = Print p str (openAll t)
-openAll (BinaryOp p op t u) = BinaryOp p op (openAll t) (openAll u)
-openAll (Let p v ty m n) = 
-    let ([v'], n') = openRename [v] n 
-    in  Let p v' ty (openAll m) (openAll n')
+openAll ns (Const p c) = Const p c
+openAll ns (Lam p x ty t) = 
+  let x' = freshen ns x 
+  in Lam p x' ty (openAll (x':ns) (open x' t))
+openAll ns (App p t u) = App p (openAll ns t) (openAll ns u)
+openAll ns (Fix p f fty x xty t) = 
+  let 
+    x' = freshen ns x
+    f' = freshen (x':ns) f
+  in Fix p f' fty x' xty (openAll (x:f:ns) (openN [f',x'] t))
+openAll ns (IfZ p c t e) = IfZ p (openAll ns c) (openAll ns t) (openAll ns e)
+openAll ns (Print p str t) = Print p str (openAll ns t)
+openAll ns (BinaryOp p op t u) = BinaryOp p op (openAll ns t) (openAll ns u)
+openAll ns (Let p v ty m n) = 
+    let v'= freshen ns v 
+    in  Let p v' ty (openAll ns m) (openAll (v':ns) (open v' n))
 
 -- | Pretty printer de nombres (Doc)
 name2doc :: Name -> Doc
@@ -142,12 +138,20 @@ binding2doc (x, ty) =
   parens (sep [name2doc x, text ":", ty2doc ty])
 
 -- | Pretty printing de términos (String)
-pp :: Term -> String
+pp :: MonadPCF m => Term -> m String
 -- Uncomment to use the Show instance for Term
 {- pp = show -}
-pp = render . t2doc False . openAll
+pp t = do
+       gdecl <- gets glb
+       return (render $ t2doc False $ openAll (map declName gdecl) t)
 
 -- | Pretty printing de declaraciones
-ppDecl :: Decl Term -> String
-ppDecl (Decl p x t) = render $ hsep [text "let", text (ppName x), text"=", t2doc False (openAll t)]
+ppDecl :: MonadPCF m => Decl Term -> m String
+ppDecl (Decl p x t) = do 
+  gdecl <- gets glb
+  return (render $ hsep [text "let", 
+                         text (ppName x), 
+                         text"=", 
+                         t2doc False (openAll (map declName gdecl) t)
+                         ])
 
