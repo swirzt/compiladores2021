@@ -1,0 +1,31 @@
+let pred = fun (n:Nat) -> n - 1
+
+let suc = fun (n:Nat) -> n + 1 
+
+let suma = fix(suma : Nat -> Nat -> Nat) (m:Nat) -> fun(n:Nat) -> ifz n then m else suc (suma m (pred n))
+
+let resta = fix(resta : Nat -> Nat -> Nat) (m:Nat) -> fun(n:Nat) -> ifz n then m else pred (resta m (pred n))
+
+let mult = fix(mult : Nat -> Nat -> Nat) (m:Nat) -> fun(n:Nat) -> ifz n then 0 else suma m  (mult m (pred n))
+
+let exp = fix(exp : Nat -> Nat -> Nat) (m:Nat) -> fun(n:Nat) -> ifz n then 1 else mult m  (exp m (pred n))
+
+let fact = fix(fact : Nat -> Nat) (n:Nat) -> ifz n then 1 else mult n (fact (pred n))
+
+let true = 1
+
+let false = 0
+
+let ifthenelse = fun(x:Nat) -> fun(t:Nat) -> fun(f:Nat) -> ifz x then f else t
+
+let pair = fun (x:Nat) -> fun (y:Nat) -> fun (n:Nat) -> ifthenelse n x y
+let proj1 = fun (p: Nat -> Nat) -> p true
+let proj2 = fun (p: Nat -> Nat) -> p false
+
+let gcd = fix(gcd:Nat -> Nat -> Nat)(m:Nat) -> fun (n:Nat) -> ifz n then m else (ifz m then n else (ifz resta n m then (gcd (resta m n) n) else (gcd m (resta n m))))
+
+let R = fun (z:Nat) -> fun (s : Nat -> Nat -> Nat) -> fix (f: Nat -> Nat) (n:Nat) -> ifz n then z else s (f (pred n)) (pred n)
+
+let suma2 = fun(x:Nat) -> fun(y:Nat )-> R y (fun (w:Nat) -> fun (z:Nat) -> suc w) x 
+
+let min = fun (f:Nat -> Nat) -> (fix(min : Nat -> Nat) (n:Nat) -> ifz (f n) then n else min (suc n)) 0
