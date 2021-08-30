@@ -14,23 +14,23 @@ module TypeChecker (
 
 import Lang
 import Global
-import MonadPCF
+import MonadFD4
 import PPrint
 import Subst
 
 
 -- | 'tc' chequea y devuelve el tipo de un término 
 -- Si el término no está bien tipado, lanza un error
--- usando la interfaz de las mónadas @MonadPCF@.
-tc :: MonadPCF m => Term         -- ^ término a chequear
+-- usando la interfaz de las mónadas @MonadFD4@.
+tc :: MonadFD4 m => Term         -- ^ término a chequear
                  -> [(Name,Ty)]  -- ^ entorno de tipado
                  -> m Ty         -- ^ tipo del término
-tc (V p (Bound _)) _ = failPosPCF p "typecheck: No deberia haber variables Bound"
+tc (V p (Bound _)) _ = failPosFD4 p "typecheck: No deberia haber variables Bound"
 tc (V p (Free n)) bs = case lookup n bs of
-                           Nothing -> failPosPCF p $ "Variable no declarada "++ppName n
+                           Nothing -> failPosFD4 p $ "Variable no declarada "++ppName n
                            Just ty -> return ty 
 tc (V p (Global n)) bs = case lookup n bs of
-                           Nothing -> failPosPCF p $ "Variable no declarada "++ppName n
+                           Nothing -> failPosFD4 p $ "Variable no declarada "++ppName n
                            Just ty -> return ty
 tc (Const _ (CNat n)) _ = return NatTy
 tc (Print p str t) bs = do 
@@ -54,7 +54,7 @@ tc (App p t u) bs = do
 tc (Fix p f fty x xty t) bs = do
          (dom, cod) <- domCod (V p (Free f)) fty
          when (dom /= xty) $ do
-           failPosPCF p "El tipo del argumento de un fixpoint debe coincidir con el \
+           failPosFD4 p "El tipo del argumento de un fixpoint debe coincidir con el \
                         \dominio del tipo de la función"
          let t' = openN [f, x] t
          ty' <- tc t' ((x,xty):(f,fty):bs)
@@ -71,16 +71,16 @@ tc (BinaryOp p op t u) bs = do
          expect NatTy uty u
 
 -- | @'typeError' t s@ lanza un error de tipo para el término @t@ 
-typeError :: MonadPCF m => Term   -- ^ término que se está chequeando  
+typeError :: MonadFD4 m => Term   -- ^ término que se está chequeando  
                         -> String -- ^ mensaje de error
                         -> m a
 typeError t s = do 
    ppt <- pp t
-   failPosPCF (getInfo t) $ "Error de tipo en "++ppt++"\n"++s
+   failPosFD4 (getInfo t) $ "Error de tipo en "++ppt++"\n"++s
  
 -- | 'expect' chequea que el tipo esperado sea igual al que se obtuvo
 -- y lanza un error si no lo es.
-expect :: MonadPCF m => Ty    -- ^ tipo esperado
+expect :: MonadFD4 m => Ty    -- ^ tipo esperado
                      -> Ty    -- ^ tipo que se obtuvo
                      -> Term  -- ^ término que se está chequeando
                      -> m Ty
@@ -91,13 +91,13 @@ expect ty ty' t = if ty == ty' then return ty
 
 -- | 'domCod chequea que un tipo sea función
 -- | devuelve un par con el tipo del dominio y el codominio de la función
-domCod :: MonadPCF m => Term -> Ty -> m (Ty, Ty)
+domCod :: MonadFD4 m => Term -> Ty -> m (Ty, Ty)
 domCod t (FunTy d c) = return (d, c)
 domCod t ty = typeError t $ "Se esperaba un tipo función, pero se obtuvo: " ++ ppTy ty
 
 -- | 'tcDecl' chequea el tipo de una declaración
 -- y la agrega al entorno de tipado de declaraciones globales
-tcDecl :: MonadPCF m  => Decl Term -> m ()
+tcDecl :: MonadFD4 m  => Decl Term -> m ()
 tcDecl (Decl p n t) = do
     --chequear si el nombre ya está declarado
     mty <- lookupTy n
@@ -106,4 +106,4 @@ tcDecl (Decl p n t) = do
                   s <- get
                   ty <- tc t (tyEnv s)                 
                   addTy n ty
-        Just _  -> failPosPCF p $ n ++" ya está declarado"
+        Just _  -> failPosFD4 p $ n ++" ya está declarado"

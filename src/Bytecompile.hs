@@ -16,7 +16,7 @@ module Bytecompile
 
 import Lang 
 import Subst
-import MonadPCF
+import MonadFD4
 
 import qualified Data.ByteString.Lazy as BS
 import Data.Binary ( Word32, Binary(put, get), decode, encode )
@@ -69,7 +69,7 @@ pattern SHIFT    = 12
 pattern DROP     = 13
 pattern PRINT    = 14
 
-bc :: MonadPCF m => Term -> m Bytecode
+bc :: MonadFD4 m => Term -> m Bytecode
 bc t = error "implementame"
 
 
@@ -85,5 +85,5 @@ bcWrite bs filename = BS.writeFile filename (encode $ BC $ fromIntegral <$> bs)
 bcRead :: FilePath -> IO Bytecode
 bcRead filename = map fromIntegral <$> un32  <$> decode <$> BS.readFile filename
 
-runBC :: MonadPCF m => Bytecode -> m ()
+runBC :: MonadFD4 m => Bytecode -> m ()
 runBC c = error "implementame"

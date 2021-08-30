@@ -1,6 +1,6 @@
 {-|
 Module      : PPrint
-Description : Pretty printer para PCF.
+Description : Pretty printer para FD4.
 Copyright   : (c) Mauro Jaskelioff, Guido Martínez, 2020.
 License     : GPL-3
 Maintainer  : mauro@fceia.unr.edu.ar
@@ -17,9 +17,10 @@ module PPrint (
 
 import Lang
 import Subst ( open, openN )
+
 import Text.PrettyPrint
     ( (<+>), nest, parens, render, sep, hsep, text, Doc )
-import MonadPCF
+import MonadFD4
 import Global
 
 freshen :: [Name] -> Name -> Name
@@ -138,7 +139,7 @@ binding2doc (x, ty) =
   parens (sep [name2doc x, text ":", ty2doc ty])
 
 -- | Pretty printing de términos (String)
-pp :: MonadPCF m => Term -> m String
+pp :: MonadFD4 m => Term -> m String
 -- Uncomment to use the Show instance for Term
 {- pp = show -}
 pp t = do
@@ -146,7 +147,7 @@ pp t = do
        return (render $ t2doc False $ openAll (map declName gdecl) t)
 
 -- | Pretty printing de declaraciones
-ppDecl :: MonadPCF m => Decl Term -> m String
+ppDecl :: MonadFD4 m => Decl Term -> m String
 ppDecl (Decl p x t) = do 
   gdecl <- gets glb
   return (render $ hsep [text "let", 

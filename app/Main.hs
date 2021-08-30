@@ -2,7 +2,7 @@
 
 {-|
 Module      : Main
-Description : Compilador de PCF.
+Description : Compilador de FD4.
 Copyright   : (c) Mauro Jaskelioff, Guido Martínez, 2020.
 License     : GPL-3
 Maintainer  : mauro@fceia.unr.edu.ar
@@ -34,7 +34,7 @@ import Parse ( P, tm, program, declOrTm, runP )
 import Elab ( elab )
 import Eval ( eval )
 import PPrint ( pp , ppTy, ppDecl )
-import MonadPCF
+import MonadFD4
 import TypeChecker ( tc, tcDecl )
 
 prompt :: String
@@ -85,7 +85,7 @@ main = execParser opts >>= go
 
     go :: (Mode,Bool,[FilePath]) -> IO ()
     go (Interactive,_,files) = 
-              do runPCF (runInputT defaultSettings (repl files))
+              do runFD4 (runInputT defaultSettings (repl files))
                  return ()
     go (Typecheck,opt, files) =
               runOrFail $ mapM_ (typecheckFile opt) files
@@ -103,16 +103,16 @@ main = execParser opts >>= go
     -- go (Build,_, files) =
     --           runOrFail $ mapM_ buildFile files
 
-runOrFail :: PCF a -> IO a
+runOrFail :: FD4 a -> IO a
 runOrFail m = do
-  r <- runPCF m
+  r <- runFD4 m
   case r of
     Left err -> do
       liftIO $ hPrint stderr err
       exitWith (ExitFailure 1)
     Right v -> return v
 
-repl :: (MonadPCF m, MonadMask m) => [FilePath] -> InputT m ()
+repl :: (MonadFD4 m, MonadMask m) => [FilePath] -> InputT m ()
 repl args = do
        lift $ catchErrors $ compileFiles args
        s <- lift get
@@ -130,14 +130,14 @@ repl args = do
                        b <- lift $ catchErrors $ handleCommand c
                        maybe loop (`when` loop) b
 
-compileFiles ::  MonadPCF m => [FilePath] -> m ()
+compileFiles ::  MonadFD4 m => [FilePath] -> m ()
 compileFiles []     = return ()
 compileFiles (x:xs) = do
         modify (\s -> s { lfile = x, inter = False })
         compileFile x
         compileFiles xs
 
-loadFile ::  MonadPCF m => FilePath -> m [Decl NTerm]
+loadFile ::  MonadFD4 m => FilePath -> m [Decl NTerm]
 loadFile f = do
     let filename = reverse(dropWhile isSpace (reverse f))
     x <- liftIO $ catch (readFile filename)
@@ -147,9 +147,9 @@ loadFile f = do
     setLastFile filename
     parseIO filename program x
 
-compileFile ::  MonadPCF m => FilePath -> m ()
+compileFile ::  MonadFD4 m => FilePath -> m ()
 compileFile f = do
-    printPCF ("Abriendo "++f++"...")
+    printFD4 ("Abriendo "++f++"...")
     let filename = reverse(dropWhile isSpace (reverse f))
     x <- liftIO $ catch (readFile filename)
                (\e -> do let err = show (e :: IOException)
@@ -158,25 +158,25 @@ compileFile f = do
     decls <- parseIO filename program x
     mapM_ handleDecl decls
 
-typecheckFile ::  MonadPCF m => Bool -> FilePath -> m ()
+typecheckFile ::  MonadFD4 m => Bool -> FilePath -> m ()
 typecheckFile opt f = do
-    printPCF  ("Chequeando "++f)
+    printFD4  ("Chequeando "++f)
     decls <- loadFile f
     ppterms <- mapM (typecheckDecl >=> ppDecl) decls
-    mapM_ printPCF ppterms
+    mapM_ printFD4 ppterms
 
-parseIO ::  MonadPCF m => String -> P a -> String -> m a
+parseIO ::  MonadFD4 m => String -> P a -> String -> m a
 parseIO filename p x = case runP p x filename of
                   Left e  -> throwError (ParseErr e)
                   Right r -> return r
 
-typecheckDecl :: MonadPCF m => Decl NTerm -> m (Decl Term)
+typecheckDecl :: MonadFD4 m => Decl NTerm -> m (Decl Term)
 typecheckDecl (Decl p x t) = do
         let dd = (Decl p x (elab t))
         tcDecl dd
         return dd
 
-handleDecl ::  MonadPCF m => Decl NTerm -> m ()
+handleDecl ::  MonadFD4 m => Decl NTerm -> m ()
 handleDecl d = do
         (Decl p x tt) <- typecheckDecl d
         te <- eval tt
@@ -239,14 +239,14 @@ helpTxt cs
 
 -- | 'handleCommand' interpreta un comando y devuelve un booleano
 -- indicando si se debe salir del programa o no.
-handleCommand ::  MonadPCF m => Command  -> m Bool
+handleCommand ::  MonadFD4 m => Command  -> m Bool
 handleCommand cmd = do
    s@GlEnv {..} <- get
    case cmd of
        Quit   ->  return False
        Noop   ->  return True
-       Help   ->  printPCF (helpTxt commands) >> return True
-       Browse ->  do  printPCF (unlines [ name | name <- reverse (nub (map declName glb)) ])
+       Help   ->  printFD4 (helpTxt commands) >> return True
+       Browse ->  do  printFD4 (unlines [ name | name <- reverse (nub (map declName glb)) ])
                       return True
        Compile c ->
                   do  case c of
@@ -257,7 +257,7 @@ handleCommand cmd = do
        PPrint e   -> printPhrase e >> return True
        Type e    -> typeCheckPhrase e >> return True
 
-compilePhrase ::  MonadPCF m => String -> m ()
+compilePhrase ::  MonadFD4 m => String -> m ()
 compilePhrase x =
   do
     dot <- parseIO "<interactive>" declOrTm x
@@ -265,16 +265,16 @@ compilePhrase x =
       Left d  -> handleDecl d
       Right t -> handleTerm t
 
-handleTerm ::  MonadPCF m => NTerm -> m ()
+handleTerm ::  MonadFD4 m => NTerm -> m ()
 handleTerm t = do
          let tt = elab t
          s <- get
          ty <- tc tt (tyEnv s)
          te <- eval tt
          ppte <- pp te
-         printPCF (ppte ++ " : " ++ ppTy ty)
+         printFD4 (ppte ++ " : " ++ ppTy ty)
 
-printPhrase   :: MonadPCF m => String -> m ()
+printPhrase   :: MonadFD4 m => String -> m ()
 printPhrase x =
   do
     x' <- parseIO "<interactive>" tm x
@@ -282,15 +282,15 @@ printPhrase x =
     t  <- case x' of 
            (V p f) -> maybe ex id <$> lookupDecl f
            _       -> return ex  
-    printPCF "NTerm:"
-    printPCF (show x')
-    printPCF "\nTerm:"
-    printPCF (show t)
+    printFD4 "NTerm:"
+    printFD4 (show x')
+    printFD4 "\nTerm:"
+    printFD4 (show t)
 
-typeCheckPhrase :: MonadPCF m => String -> m ()
+typeCheckPhrase :: MonadFD4 m => String -> m ()
 typeCheckPhrase x = do
          t <- parseIO "<interactive>" tm x
          let tt = elab t
          s <- get
          ty <- tc tt (tyEnv s)
-         printPCF (ppTy ty)
+         printFD4 (ppTy ty)

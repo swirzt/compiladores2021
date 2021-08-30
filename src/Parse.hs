@@ -1,6 +1,6 @@
 {-|
 Module      : Parse
-Description : Define un parser de términos PCF0 a términos fully named.
+Description : Define un parser de términos FD40 a términos fully named.
 Copyright   : (c) Mauro Jaskelioff, Guido Martínez, 2020.
 License     : GPL-3
 Maintainer  : mauro@fceia.unr.edu.ar
