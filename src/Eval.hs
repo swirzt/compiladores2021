@@ -14,7 +14,7 @@ module Eval where
 import Common ( abort )
 import Lang
 import Subst ( substN, subst )
-import MonadPCF ( MonadPCF, lookupDecl, failPCF, printPCF )
+import MonadFD4 ( MonadFD4, lookupDecl, failFD4, printFD4 )
 import PPrint ( ppName )
 
 -- | Semántica de operadores binarios
@@ -23,12 +23,12 @@ semOp Add x y=  x + y
 semOp Sub x y = max 0 (x - y)
 
 -- | Evaluador de términos CBV
-eval ::  MonadPCF m => Term -> m Term
+eval ::  MonadFD4 m => Term -> m Term
 eval (V _ (Global nm)) = do
   -- unfold and keep going
   mtm <- lookupDecl nm 
   case mtm of 
-    Nothing -> failPCF $ "Error de ejecución: variable no declarada: " ++ ppName nm 
+    Nothing -> failFD4 $ "Error de ejecución: variable no declarada: " ++ ppName nm 
     Just t -> eval t
 
 eval (App p l r) = do
@@ -44,7 +44,7 @@ eval (App p l r) = do
 eval (Print p str t) = do
         te <- eval t
         case te of
-          Const _ (CNat n) -> do printPCF (str++show n)
+          Const _ (CNat n) -> do printFD4 (str++show n)
                                  return te
           _                -> abort "Error de tipo en runtime!"
 eval (BinaryOp p op t u) = do 

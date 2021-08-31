@@ -3,32 +3,32 @@
 {-# LANGUAGE FlexibleContexts #-}
 
 {-|
-Module      : MonadPCF
+Module      : MonadFD4
 Description : Mónada con soporte para estado, errores, e IO.
 Copyright   : (c) Mauro Jaskelioff, Guido Martínez, 2020.
 License     : GPL-3
 Maintainer  : mauro@fceia.unr.edu.ar
 Stability   : experimental
 
-Definimos la clase de mónadas 'MonadPCF' que abstrae las mónadas con soporte para estado, errores e IO,
-y la mónada 'PCF' que provee una instancia de esta clase.
+Definimos la clase de mónadas 'MonadFD4' que abstrae las mónadas con soporte para estado, errores e IO,
+y la mónada 'FD4' que provee una instancia de esta clase.
 -}
 
-module MonadPCF (
-  PCF,
-  runPCF,
+module MonadFD4 (
+  FD4,
+  runFD4,
   lookupDecl,
   lookupTy,
-  printPCF,
+  printFD4,
   setLastFile,
   getLastFile,
   eraseLastFileDecls,
-  failPosPCF,
-  failPCF,
+  failPosFD4,
+  failFD4,
   addDecl,
   addTy,
   catchErrors,
-  MonadPCF,
+  MonadFD4,
   module Control.Monad.Except,
   module Control.Monad.State)
  where
@@ -42,9 +42,9 @@ import Control.Monad.Except
 import System.IO
 import Data.List (deleteFirstsBy)
 
--- * La clase 'MonadPCFm'
+-- * La clase 'MonadFD4m'
 
-{-| La clase de mónadas 'MonadPCF' clasifica a las mónadas con soporte para operaciones @IO@, estado de tipo 'Global.GlEnv', y errores de tipo 'Errors.Error'.
+{-| La clase de mónadas 'MonadFD4' clasifica a las mónadas con soporte para operaciones @IO@, estado de tipo 'Global.GlEnv', y errores de tipo 'Errors.Error'.
 
 Las mónadas @m@ de esta clase cuentan con las operaciones:
    - @get :: m GlEnv@
@@ -57,24 +57,24 @@ y otras operaciones derivadas de ellas, como por ejemplo
    - @modify :: (GlEnv -> GlEnv) -> m ()
 
 -}
-class (MonadIO m, MonadState GlEnv m, MonadError Error m) => MonadPCF m where
+class (MonadIO m, MonadState GlEnv m, MonadError Error m) => MonadFD4 m where
 
-printPCF :: MonadPCF m => String -> m ()
-printPCF = liftIO . putStrLn
+printFD4 :: MonadFD4 m => String -> m ()
+printFD4 = liftIO . putStrLn
 
-setLastFile :: MonadPCF m => FilePath -> m ()
+setLastFile :: MonadFD4 m => FilePath -> m ()
 setLastFile filename = modify (\s -> s {lfile = filename})
 
-getLastFile :: MonadPCF m => m FilePath
+getLastFile :: MonadFD4 m => m FilePath
 getLastFile = gets lfile
 
-addDecl :: MonadPCF m => Decl Term -> m ()
+addDecl :: MonadFD4 m => Decl Term -> m ()
 addDecl d = modify (\s -> s { glb = d : glb s, cantDecl = cantDecl s + 1 })
   
-addTy :: MonadPCF m => Name -> Ty -> m ()
+addTy :: MonadFD4 m => Name -> Ty -> m ()
 addTy n ty = modify (\s -> s { tyEnv = (n,ty) : tyEnv s })
 
-eraseLastFileDecls :: MonadPCF m => m ()
+eraseLastFileDecls :: MonadFD4 m => m ()
 eraseLastFileDecls = do 
       s <- get
       let n = cantDecl s
@@ -85,25 +85,25 @@ eraseLastFileDecls = do
 hasName :: Name -> Decl a -> Bool
 hasName nm (Decl { declName = nm' }) = nm == nm'
 
-lookupDecl :: MonadPCF m => Name -> m (Maybe Term)
+lookupDecl :: MonadFD4 m => Name -> m (Maybe Term)
 lookupDecl nm = do
      s <- get
      case filter (hasName nm) (glb s) of
        (Decl { declBody=e }):_ -> return (Just e)
        [] -> return Nothing
 
-lookupTy :: MonadPCF m => Name -> m (Maybe Ty)
+lookupTy :: MonadFD4 m => Name -> m (Maybe Ty)
 lookupTy nm = do
       s <- get
       return $ lookup nm (tyEnv s)
 
-failPosPCF :: MonadPCF m => Pos -> String -> m a
-failPosPCF p s = throwError (ErrPos p s)
+failPosFD4 :: MonadFD4 m => Pos -> String -> m a
+failPosFD4 p s = throwError (ErrPos p s)
 
-failPCF :: MonadPCF m => String -> m a
-failPCF = failPosPCF NoPos
+failFD4 :: MonadFD4 m => String -> m a
+failFD4 = failPosFD4 NoPos
 
-catchErrors  :: MonadPCF m => m a -> m (Maybe a)
+catchErrors  :: MonadFD4 m => m a -> m (Maybe a)
 catchErrors c = catchError (Just <$> c) 
                            (\e -> liftIO $ hPutStrLn stderr (show e) 
                               >> return Nothing)
@@ -111,19 +111,19 @@ catchErrors c = catchError (Just <$> c)
 ----
 -- Importante, no eta-expandir porque GHC no hace una
 -- eta-contracción de sinónimos de tipos
--- y Main no va a compilar al escribir `InputT PCF()`
+-- y Main no va a compilar al escribir `InputT FD4()`
 
--- | El tipo @PCF@ es un sinónimo de tipo para una mónada construida usando dos transformadores de mónada sobre la mónada @IO@.
+-- | El tipo @FD4@ es un sinónimo de tipo para una mónada construida usando dos transformadores de mónada sobre la mónada @IO@.
 -- El transformador de mónad @ExcepT Error@ agrega a la mónada IO la posibilidad de manejar errores de tipo 'Errors.Error'.
 -- El transformador de mónadas @StateT GlEnv@ agrega la mónada @ExcepT Error IO@ la posibilidad de manejar un estado de tipo 'Global.GlEnv'.
-type PCF = StateT GlEnv (ExceptT Error IO)
+type FD4 = StateT GlEnv (ExceptT Error IO)
 
--- | Esta es una instancia vacía, ya que 'MonadPCF' no tiene funciones miembro.
-instance MonadPCF PCF
+-- | Esta es una instancia vacía, ya que 'MonadFD4' no tiene funciones miembro.
+instance MonadFD4 FD4
 
--- 'runPCF\'' corre una computación de la mónad 'PCF' en el estado inicial 'Global.initialEnv' 
-runPCF' :: PCF a -> IO (Either Error (a, GlEnv))
-runPCF' c =  runExceptT $ runStateT c initialEnv
+-- 'runFD4\'' corre una computación de la mónad 'FD4' en el estado inicial 'Global.initialEnv' 
+runFD4' :: FD4 a -> IO (Either Error (a, GlEnv))
+runFD4' c =  runExceptT $ runStateT c initialEnv
 
-runPCF:: PCF a -> IO (Either Error a)
-runPCF c = fmap fst <$> runPCF' c
+runFD4:: FD4 a -> IO (Either Error a)
+runFD4 c = fmap fst <$> runFD4' c
