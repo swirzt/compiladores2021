@@ -31,15 +31,15 @@ lexer :: Tok.TokenParser u
 lexer = Tok.makeTokenParser $
         emptyDef {
          commentLine    = "#",
-         reservedNames = ["let", "fun", "fix", "then", "else","in", 
-                           "ifz", "print","Nat"],
+         reservedNames = ["let", "fun", "fix", "then", "else","in",
+                           "ifz", "print", "Nat", "rec", "type"],
          reservedOpNames = ["->",":","=","+","-"]
         }
 
 whiteSpace :: P ()
 whiteSpace = Tok.whiteSpace lexer
 
-natural :: P Integer 
+natural :: P Integer
 natural = Tok.natural lexer
 
 stringLiteral :: P String
@@ -65,74 +65,91 @@ num :: P Int
 num = fromInteger <$> natural
 
 var :: P Name
-var = identifier 
+var = identifier
 
 getPos :: P Pos
 getPos = do pos <- getPosition
             return $ Pos (sourceLine pos) (sourceColumn pos)
 
-tyatom :: P Ty
-tyatom = (reserved "Nat" >> return NatTy)
+tyatom :: P STy
+tyatom = (reserved "Nat" >> return SNatTy)
+         <|> try (SVarTy <$> var) -- Es necesario var?
          <|> parens typeP
 
-typeP :: P Ty
-typeP = try (do 
+typeP :: P STy
+typeP = try (do
           x <- tyatom
           reservedOp "->"
           y <- typeP
-          return (FunTy x y))
+          return (SFunTy x y))
       <|> tyatom
-          
+
 const :: P Const
 const = CNat <$> num
 
-printOp :: P NTerm
+printOp :: P STerm
 printOp = do
   i <- getPos
   reserved "print"
   str <- option "" stringLiteral
   a <- atom
-  return (Print i str a)
+  return (SPrint i str a)
 
-binary :: String -> BinaryOp -> Assoc -> Operator String () Identity NTerm
-binary s f = Ex.Infix (reservedOp s >> return (BinaryOp NoPos f))
+binary :: String -> BinaryOp -> Assoc -> Operator String () Identity STerm
+binary s f = Ex.Infix (reservedOp s >> return (SBinaryOp NoPos f))
 
-table :: [[Operator String () Identity NTerm]]
+table :: [[Operator String () Identity STerm]]
 table = [[binary "+" Add Ex.AssocLeft,
           binary "-" Sub Ex.AssocLeft]]
 
-expr :: P NTerm
+expr :: P STerm
 expr = Ex.buildExpressionParser table tm
 
-atom :: P NTerm
-atom =     (flip Const <$> const <*> getPos)
-       <|> flip V <$> var <*> getPos
+atom :: P STerm
+atom =     (flip SConst <$> const <*> getPos)
+       <|> flip SV <$> var <*> getPos
        <|> parens expr
        <|> printOp
 
 -- parsea un par (variable : tipo)
-binding :: P (Name, Ty)
+binding :: P (Name, STy)
 binding = do v <- var
              reservedOp ":"
              ty <- typeP
              return (v, ty)
 
-lam :: P NTerm
+binders :: P [(Name,STy)]
+binders = (do x <- parens binding
+              xs <- binders
+              return (x:xs))
+          <|> return []
+          --Si no anda, sacar el x <. parens binding arafue
+
+lam :: P STerm
 lam = do i <- getPos
          reserved "fun"
-         (v,ty) <- parens binding
+         xs <- binders
          reservedOp "->"
          t <- expr
-         return (Lam i v ty t)
+         return (SLam i xs t)
 
 -- Nota el parser app también parsea un solo atom.
-app :: P NTerm
+app :: P STerm
 app = (do i <- getPos
           f <- atom
           args <- many atom
-          return (foldl (App i) f args))
+          return (foldl (SApp i) f args))
 
-ifz :: P NTerm
+fix :: P STerm
+fix = do i <- getPos
+         reserved "fix"
+         (f, fty) <- parens binding
+         (x, xty) <- parens binding
+         reservedOp "->"
+         t <- expr
+         return (SFix i f fty x xty t)
+         
+ifz :: P STerm
 ifz = do i <- getPos
          reserved "ifz"
          c <- expr
@@ -140,35 +157,43 @@ ifz = do i <- getPos
          t <- expr
          reserved "else"
          e <- expr
-         return (IfZ i c t e)
+         return (SIfZ i c t e)
 
-fix :: P NTerm
-fix = do i <- getPos
-         reserved "fix"
-         (f, fty) <- parens binding
-         (x, xty) <- parens binding
-         reservedOp "->"
-         t <- expr
-         return (Fix i f fty x xty t)
+letexp' :: Pos -> Bool -> P STerm
+letexp' i b = do v <- var
+                 mvars <- binders
+                 reservedOp ":"
+                 ty <- typeP
+                 reservedOp "="
+                 def <- expr
+                 reserved "in"
+                 body <- expr
+                 return (SLet i v mvars ty def body b)
 
-letexp :: P NTerm
+letexp :: P STerm
 letexp = do
   i <- getPos
   reserved "let"
-  (v,ty) <- parens binding
-  reservedOp "="  
-  def <- expr
-  reserved "in"
-  body <- expr
-  return (Let i v ty def body)
+  (do reserved "rec"
+      letexp' i True
+      <|> letexp' i False)
+
+-- | Parser de type
+typeexp :: P STerm
+typeexp = do i <- getPos
+             reserved "type"
+             v <- var
+             reservedOp "="
+             ty <- typeP
+             return (SType i v ty)
 
 -- | Parser de términos
-tm :: P NTerm
-tm = app <|> lam <|> ifz <|> printOp <|> fix <|> letexp
+tm :: P STerm
+tm = app <|> lam <|> ifz <|> printOp <|> fix <|> letexp <|> typeexp
 
 -- | Parser de declaraciones
-decl :: P (Decl NTerm)
-decl = do 
+decl :: P (Decl STerm)
+decl = do
      i <- getPos
      reserved "let"
      v <- var

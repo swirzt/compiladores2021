@@ -27,6 +27,13 @@ data Ty =
     | FunTy Ty Ty
     deriving (Show,Eq)
 
+-- | AST de Tipos con Sugar
+data STy =
+      SNatTy
+    | SFunTy STy STy
+    | SVarTy String
+    deriving (Show,Eq)
+
 type Name = String
 
 data Const = CNat Int
@@ -59,8 +66,24 @@ data Tm info var =
   | Let info Name Ty (Tm info var)  (Tm info var)
   deriving (Show, Functor)
 
+data STm info var =
+    SV info var
+  | SConst info Const
+  | SLam info [(Name, STy)] (STm info var)
+  | SApp info (STm info var) (STm info var)
+  | SPrint info String (STm info var)
+  | SBinaryOp info BinaryOp (STm info var) (STm info var)
+  | SFix info Name STy Name STy (STm info var)
+  | SIfZ info (STm info var) (STm info var) (STm info var)
+  | SLet info Name [(Name, STy)] STy (STm info var) (STm info var) Bool
+  -- Si la primer lista de Let es vacio es sin sugar
+  | SType info Name STy
+  deriving (Show, Functor)
+
+type STerm = STm Pos Name  -- ^ 'STm' tiene 'Name's como variables ligadas y libres y globales, guarda posición, y azucar sintactico 
 type NTerm = Tm Pos Name   -- ^ 'Tm' tiene 'Name's como variables ligadas y libres y globales, guarda posición
-type Term = Tm Pos Var     -- ^ 'Tm' con índices de De Bruijn como variables ligadas, y nombres para libres y globales, guarda posición
+type Term = Tm Pos Var     -- ^ 'Tm' con índices de De Bruijn como variables ligadas, y nombres para libres y globales, guarda posición`
+
 
 data Var =
     Bound !Int
