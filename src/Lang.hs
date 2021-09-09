@@ -25,6 +25,7 @@ import           Data.List.Extra                ( nubSort )
 data Ty =
       NatTy
     | FunTy Ty Ty
+    | NameTy Name Ty
     deriving (Show,Eq)
 
 -- | AST de Tipos con Sugar
@@ -73,7 +74,7 @@ data STm info var =
   | SApp info (STm info var) (STm info var)
   | SPrint info String (STm info var)
   | SBinaryOp info BinaryOp (STm info var) (STm info var)
-  | SFix info Name STy Name STy (STm info var)
+  | SFix info Name STy [(Name,STy)] (STm info var)
   | SIfZ info (STm info var) (STm info var) (STm info var)
   | SLet info Name [(Name, STy)] STy (STm info var) (STm info var) Bool
   -- Si la primer lista de Let es vacio es sin sugar
