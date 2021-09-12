@@ -174,9 +174,9 @@ letexp :: P STerm
 letexp = do
   i <- getPos
   reserved "let"
-  (do reserved "rec"
-      letexp' i True
-      <|> letexp' i False)
+  do reserved "rec"
+     letexp' i True
+     <|> letexp' i False
 
 -- | Parser de type
 typeexp :: P STerm
