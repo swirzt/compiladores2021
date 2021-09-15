@@ -20,6 +20,7 @@ import Text.ParserCombinators.Parsec.Language --( GenLanguageDef(..), emptyDef )
 import qualified Text.Parsec.Expr as Ex
 import Text.Parsec.Expr (Operator, Assoc)
 import Control.Monad.Identity (Identity)
+import System.IO --Para printear en test
 
 type P = Parsec String ()
 
@@ -160,7 +161,9 @@ ifz = do i <- getPos
          return (SIfZ i c t e)
 
 letexp' :: Pos -> Bool -> P STerm
-letexp' i b = do v <- var
+letexp' i b = do {try v <- var; reservedOp ":"; ty <- typeP; reservedOp "="; def <- expr; reserved "in"; body <- expr; return }
+  
+                 v <- var
                  mvars <- binders
                  reservedOp ":"
                  ty <- typeP
@@ -170,13 +173,24 @@ letexp' i b = do v <- var
                  body <- expr
                  return (SLet i v mvars ty def body b)
 
+-- letexp :: P STerm
+-- letexp = do
+--   i <- getPos
+--   reserved "let"
+--   (do reserved "rec"
+--       letexp' i True
+--       <|> letexp' i False)
+
 letexp :: P STerm
-letexp = do
-  i <- getPos
-  reserved "let"
-  do reserved "rec"
-     letexp' i True
-     <|> letexp' i False
+letexp = do i <- getPos
+            try  (do reserved "let"
+                     reserved "rec"
+                     letexp' i True)
+            <|> do i <- getPos
+                   reserved "let"
+                   letexp' i False
+
+
 
 -- | Parser de type
 typeexp :: P STerm
