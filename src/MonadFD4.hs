@@ -19,6 +19,7 @@ module MonadFD4 (
   runFD4,
   lookupDecl,
   lookupTy,
+  lookupTyDef,
   printFD4,
   setLastFile,
   getLastFile,
@@ -27,6 +28,7 @@ module MonadFD4 (
   failFD4,
   addDecl,
   addTy,
+  addTyDef,
   catchErrors,
   MonadFD4,
   module Control.Monad.Except,
@@ -74,6 +76,9 @@ addDecl d = modify (\s -> s { glb = d : glb s, cantDecl = cantDecl s + 1 })
 addTy :: MonadFD4 m => Name -> Ty -> m ()
 addTy n ty = modify (\s -> s { tyEnv = (n,ty) : tyEnv s })
 
+addTyDef :: MonadFD4 m => Name -> Ty -> m ()
+addTyDef n ty = modify (\s -> s {typeDefs = (n,ty) : typeDefs s}) --Haskell me da miedo
+
 eraseLastFileDecls :: MonadFD4 m => m ()
 eraseLastFileDecls = do 
       s <- get
@@ -83,19 +88,24 @@ eraseLastFileDecls = do
       modify (\s -> s {glb = rem, cantDecl = 0, tyEnv = tyEnv'})
    where deleteTy xs ps = deleteFirstsBy (\x y -> fst x == fst y) ps (map (flip (,) NatTy) xs)
 hasName :: Name -> Decl a -> Bool
-hasName nm (Decl { declName = nm' }) = nm == nm'
+hasName nm (DeclFun { declName = nm' }) = nm == nm'
 
 lookupDecl :: MonadFD4 m => Name -> m (Maybe Term)
 lookupDecl nm = do
      s <- get
      case filter (hasName nm) (glb s) of
-       (Decl { declBody=e }):_ -> return (Just e)
+       (DeclFun { declBody=e }):_ -> return (Just e)
        [] -> return Nothing
 
 lookupTy :: MonadFD4 m => Name -> m (Maybe Ty)
 lookupTy nm = do
       s <- get
       return $ lookup nm (tyEnv s)
+
+lookupTyDef :: MonadFD4 m => Name -> m (Maybe Ty)
+lookupTyDef nm = do
+      s <- get
+      return $ lookup nm (typeDefs s)
 
 failPosFD4 :: MonadFD4 m => Pos -> String -> m a
 failPosFD4 p s = throwError (ErrPos p s)
@@ -107,6 +117,7 @@ catchErrors  :: MonadFD4 m => m a -> m (Maybe a)
 catchErrors c = catchError (Just <$> c) 
                            (\e -> liftIO $ hPutStrLn stderr (show e) 
                               >> return Nothing)
+
 
 ----
 -- Importante, no eta-expandir porque GHC no hace una

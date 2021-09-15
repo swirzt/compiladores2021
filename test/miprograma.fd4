@@ -6,6 +6,8 @@ let suma = fix(suma : Nat -> Nat -> Nat) (m:Nat) -> fun(n:Nat) -> ifz n then m e
 
 let resta = fix(resta : Nat -> Nat -> Nat) (m:Nat) -> fun(n:Nat) -> ifz n then m else pred (resta m (pred n))
 
+let rec mults (m : Nat) (n : Nat) : Nat = ifz n then 0 else m + (mults m (n - 1)) in mults 2 3
+
 let mult = fix(mult : Nat -> Nat -> Nat) (m:Nat) -> fun(n:Nat) -> ifz n then 0 else suma m  (mult m (pred n))
 
 let exp = fix(exp : Nat -> Nat -> Nat) (m:Nat) -> fun(n:Nat) -> ifz n then 1 else mult m  (exp m (pred n))

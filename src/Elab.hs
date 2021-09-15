@@ -10,12 +10,13 @@ Este módulo permite elaborar términos y declaraciones para convertirlas desde
 fully named (@NTerm) a locally closed (@Term@) 
 -}
 
-module Elab ( elab ) where
+module Elab ( elab, desugarDecl, desugarTy ) where
 
 import MonadFD4  
 
 import Lang
 import Subst
+import MonadFD4 (failPosFD4, failFD4, lookupTyDef)
 
 -- | 'desugar' transforma un termino con azucar sintactico a un NTerm
 desugar :: MonadFD4 m => STerm -> m NTerm
@@ -25,10 +26,12 @@ desugar (SConst info const) = return $ Const info const
 
 desugar (SLam info [] _) = failPosFD4 info "No se dio un argumento a la función"
 desugar (SLam info [(n,ty)] stm) = do stmDesugar <- desugar stm
-                                      return $ Lam info n (desugarTy ty) stmDesugar
+                                      tyDesugar <- desugarTy ty
+                                      return $ Lam info n tyDesugar stmDesugar
 
 desugar (SLam info ((n,ty):xs) stm) = do stmDesugar <- desugar (SLam info xs stm)
-                                         return $ Lam info n (desugarTy ty) stmDesugar
+                                         tyDesugar <- desugarTy ty
+                                         return $ Lam info n tyDesugar stmDesugar
 
 desugar (SApp info stm1 stm2) = do stm1Desugar <- desugar stm1
                                    stm2Desugar <- desugar stm2
@@ -43,9 +46,14 @@ desugar (SBinaryOp info b stm1 stm2) = do stm1Desugar <- desugar stm1
 
 desugar (SFix info _ _ [] _) = failPosFD4 info "Falta el argumento del fix"
 desugar (SFix info f fty [(n,sty)] stm) = do stmDesugar <- desugar stm
-                                             return $ Fix info f (desugarTy fty) n (desugarTy sty) stmDesugar
+                                             ftyDesugar <- desugarTy fty
+                                             tyDesugar <- desugarTy sty
+                                             return $ Fix info f ftyDesugar n tyDesugar stmDesugar
+
 desugar (SFix info f fty ((n,sty):xs) stm) = do stmDesugar <- desugar (SLam info xs stm)
-                                                return $ Fix info f (desugarTy fty) n (desugarTy sty) stmDesugar
+                                                ftyDesugar <- desugarTy fty
+                                                tyDesugar <- desugarTy sty
+                                                return $ Fix info f ftyDesugar n tyDesugar stmDesugar
 
 desugar (SIfZ info stmb stmt stmf) = do stmb' <- desugar stmb
                                         stmt' <- desugar stmt
@@ -54,30 +62,43 @@ desugar (SIfZ info stmb stmt stmf) = do stmb' <- desugar stmb
 
 desugar (SLet info f [] lty stmt stmt' False) = do stmtDesugar <- desugar stmt
                                                    stmtDesugar' <- desugar stmt'
-                                                   return $ Let info f (desugarTy lty)  stmtDesugar stmtDesugar'
+                                                   tyDesugar <- desugarTy lty
+                                                   return $ Let info f tyDesugar stmtDesugar stmtDesugar'
 desugar (SLet info _ [] _ _ _ True) = failPosFD4 info "Falta el argumento del fix"
 desugar (SLet info f [(n,sty)] lty stmt stmt' True) = do  stmtDesugar <- desugar $ SFix info f (SFunTy sty lty) [(n,sty)] stmt
                                                           stmtDesugar' <- desugar stmt'
-                                                          return $ Let info f (FunTy (desugarTy sty) (desugarTy lty)) stmtDesugar stmtDesugar'
+                                                          styDesugar <- desugarTy sty
+                                                          ltyDesugar <- desugarTy lty
+                                                          return $ Let info f (FunTy styDesugar ltyDesugar) stmtDesugar stmtDesugar'
 desugar (SLet info f ((n,sty):xs) lty stmt stmt' True) = do stmtDesugar <- desugar $ SLet info f [(n,sty)] (concatTy xs lty) (SLam info xs stmt) stmt' True
                                                             return stmtDesugar
   -- desugar (SLet info f [(n,sty)] lty stmt stmt' False) = Let info f (FunTy sty lty) (desugar $ SLam info [(n,sty)] stmt) (desugar stmt')
 desugar (SLet info f xs lty stmt stmt' False) = do stmtDesugar' <- desugar stmt'
                                                    lamDesugar <- desugar $ SLam info xs stmt
-                                                   return $ Let info f (desugarTy (concatTy xs lty)) lamDesugar stmtDesugar'
+                                                   ty <- deconcatTy xs lty
+                                                   return $ Let info f ty lamDesugar stmtDesugar'
 
-desugarTy :: STy -> Ty
-desugarTy SNatTy = NatTy
-desugarTy (SFunTy a b) = FunTy (desugarTy a) (desugarTy b)
+desugarTy :: MonadFD4 m => STy -> m Ty
+desugarTy SNatTy = return NatTy
+desugarTy (SFunTy a b) = do a' <- desugarTy a
+                            b' <- desugarTy b
+                            return $ FunTy a' b'
+desugarTy (SVarTy n) = do ss <- lookupTyDef n
+                          case ss of
+                            Nothing -> failFD4 $ "El tipo " ++ show n ++ " no se encuentra declarado en el entorno." 
+                            Just ty -> return $ NameTy n ty
 
 concatTy :: [(a,STy)] -> STy -> STy
 concatTy [] a = a
 concatTy ((name,sty):xs) a = SFunTy sty (concatTy xs a)
 
+deconcatTy :: MonadFD4 m => [(a,STy)] -> STy -> m Ty
+deconcatTy xs a = desugarTy $ concatTy xs a
+
 -- desugar ( Si la primer lista de Let es vacio es sin sugar
 -- desugar (SType info Name STy
 
--- | 'elab' transforma variables ligadas en índices de de Bruijn
+-- 'elab' transforma variables ligadas en índices de de Bruijn
 -- en un término dado. 
 elab :: MonadFD4 m => STerm -> m Term
 elab n = do nterm <- desugar n
@@ -105,3 +126,12 @@ elab' env (Let p v vty def body) = Let p v vty (elab' env def) (close v (elab' (
 
 -- elab_decl :: Decl STerm -> Decl Term
 -- elab_decl = fmap elab
+
+desugarDecl :: MonadFD4 m => SDecl STerm -> m (Decl STerm)
+desugarDecl (SDeclFun pos name vars ty def False) = do  tyDesugar <- deconcatTy vars ty
+                                                        case vars of
+                                                          [] -> return $ DeclFun pos name tyDesugar def
+                                                          _ -> return $ DeclFun pos name tyDesugar (SLam pos vars def)
+desugarDecl (SDeclFun pos name vars ty def True)  = do  tyDesugar <- deconcatTy vars ty
+                                                        return $ DeclFun pos name tyDesugar (SFix pos name ty vars def)
+desugarDecl _ = failFD4 "Si llegué acá algo esta mal jej"

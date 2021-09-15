@@ -171,7 +171,7 @@ render = unpack . renderStrict . layoutSmart defaultLayoutOptions
 
 -- | Pretty printing de declaraciones
 ppDecl :: MonadFD4 m => Decl Term -> m String
-ppDecl (Decl p x t) = do 
+ppDecl (DeclFun p x ty t) = do 
   gdecl <- gets glb
   return (render $ sep [defColor (pretty "let")
                        , name2doc x 
