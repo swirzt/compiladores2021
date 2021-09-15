@@ -160,11 +160,12 @@ ifz = do i <- getPos
          e <- expr
          return (SIfZ i c t e)
 
+-- let x:Nat = 5 in x + 1
+-- do {try v <- var; reservedOp ":"; ty <- typeP; reservedOp "="; def <- expr; reserved "in"; body <- expr; return }
+
 letexp' :: Pos -> Bool -> P STerm
-letexp' i b = do {try v <- var; reservedOp ":"; ty <- typeP; reservedOp "="; def <- expr; reserved "in"; body <- expr; return }
-  
-                 v <- var
-                 mvars <- binders
+letexp' i b = do v <- var
+                 mvars <- binders 
                  reservedOp ":"
                  ty <- typeP
                  reservedOp "="
@@ -190,7 +191,28 @@ letexp = do i <- getPos
                    reserved "let"
                    letexp' i False
 
+-- letexp :: P Sterm
+-- letexp = do i <- getPos
+--             (try letV i <|> letF i)
 
+-- let x:Nat = 5 in ...
+-- let f : Nat -> Nat -> Nat = ... in ...
+-- let f (x:Nat) : Nat = ... in ...
+
+-- letV :: Pos -> P Sterm
+-- letV i = do reserved "let"
+--             [(name,type)] <- binders
+--             reservedOp "="
+--             def <- expr
+--             reserved "in"
+--             body <- expr
+--             return (SLet i name [] type def body False)
+
+-- letF :: Pos -> P Sterm
+-- letF i = do try (do reserved "let"
+--                     reserved "rec" 
+--                     letF' i True)
+--             <|> do reserved ""        
 
 -- | Parser de type
 typeexp :: P STerm
