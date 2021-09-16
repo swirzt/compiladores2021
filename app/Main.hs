@@ -187,10 +187,8 @@ typecheckDecl (SDeclType i n v) = do tyDesugar <- desugarTy v
 handleDecl ::  MonadFD4 m => SDecl STerm -> m ()
 handleDecl d = do
         output <- typecheckDecl d -- Hacer un case de la salida
-        printFD4 (show output)
         case output of
           DeclFun p n ty tt -> do te <- eval tt
-                                  printFD4 (show te)
                                   addDecl (DeclFun p n ty te)
           _ -> return ()
 
@@ -273,7 +271,6 @@ compilePhrase ::  MonadFD4 m => String -> m ()
 compilePhrase x =
   do
     dot <- parseIO "<interactive>" declOrTm x
-    printFD4 (show dot)
     case dot of 
       Left d  -> handleDecl d
       Right t -> handleTerm t

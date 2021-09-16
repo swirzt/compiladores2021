@@ -23,14 +23,22 @@ data Ty
   = NatTy
   | FunTy Ty Ty
   | NameTy Name Ty
-  deriving (Show, Eq)
+  deriving (Show)
+
+instance Eq Ty where
+  NatTy == NatTy         = True
+  NatTy == FunTy _ _     = False
+  FunTy _ _ == NatTy     = False
+  FunTy x y == FunTy w z = x == w && y == z
+  NameTy n t == x        = t == x
+  x == NameTy n t        = x == t
 
 -- | AST de Tipos con Sugar
 data STy
   = SNatTy
   | SFunTy STy STy
   | SVarTy String
-  deriving (Show, Eq)
+  deriving Show
 
 type Name = String
 
