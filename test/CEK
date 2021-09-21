@@ -1,0 +1,38 @@
+Contextos de evaluacion:
+E ::= 
+☐
+E t
+v E
+ifz E then t else e
+E ⊕ t
+v ⊕ E
+print E
+let var = E in t
+let var = v in E
+
+Marcos:
+fr ::= ☐ t | v ☐ | ifz ☐ then t else e | ☐ ⊕ t | v ⊕ ☐ | print str ☐ | let x = ☐ in t
+
+Maquina CK:
+
+<print s t, k> -> <t, print s ☐ ≻ k >
+<t \oplus u, k> -> <t, ☐ ⊕ u ≻ k>
+<ifz c then t else e, k> -> <c, if< ☐ then t else e ≻ k>
+<t u, k> -> <t, ☐ u ≻ k>
+<let var = t in t', k> -> <t , let var = ☐ in t' ≻ k>
+<v, k> -> <<v,k>>
+
+<<n , print s ☐ ≻ k>> -> <<n,k>>
+<<n, ☐ ⊕ u ≻ k >> -> <n , n ⊕ ☐ ≻ k>
+<< n', n ⊕ ☐ ≻ k >> -> << n ⊕ n' , k >>
+<<0, ifz ☐ then t else e ≻ k>> -> <t, k>
+<<np, ifz ☐ then t else e ≻ k>> -> <e,k>
+<<v , ☐ u ≻ k>> -> <u, v ☐ ≻ k>
+<<v, (fun x. t) ☐ ≻ k >> -> < [v/x]t, k>
+<<v, (fix f x. t) ☐ ≻ k >> -> <[fix f x.t/f,v/x]t, k>
+<<v, let x = ☐ in t ≻ k >> -> <[v/x]t , k>
+
+Marcos CEK:
+
+fr ::= ρ.☐ t | clos ☐ | ρ.ifz ☐ then t else e | ρ.☐ ⊕ t | v ⊕ ☐ | print str ☐ | let x = ☐ in t
+Let no se modifica porque el entorno no me afecta, ρ se va a modificar cuando entre a t
