@@ -79,6 +79,7 @@ ty2doc :: Ty -> Doc AnsiStyle
 ty2doc NatTy     = typeColor (pretty "Nat")
 ty2doc (FunTy x@(FunTy _ _) y) = sep [parens (ty2doc x), typeOpColor (pretty "->"),ty2doc y]
 ty2doc (FunTy x y) = sep [ty2doc x, typeOpColor (pretty "->"),ty2doc y] 
+ty2doc (NameTy n t) = name2doc n
 
 -- | Pretty printer para tipos (String)
 ppTy :: Ty -> String
@@ -171,11 +172,16 @@ render = unpack . renderStrict . layoutSmart defaultLayoutOptions
 
 -- | Pretty printing de declaraciones
 ppDecl :: MonadFD4 m => Decl Term -> m String
-ppDecl (Decl p x t) = do 
+ppDecl (DeclFun _ x ty t) = do 
   gdecl <- gets glb
   return (render $ sep [defColor (pretty "let")
-                       , name2doc x 
-                       , defColor (pretty "=")] 
-                   <+> nest 2 (t2doc False (openAll (map declName gdecl) t)))
-                         
+                        , name2doc x 
+                        , defColor (pretty ":")
+                        , ty2doc ty
+                        , defColor (pretty "=")]
+                  <+> nest 2 (t2doc False (openAll (map declName gdecl) t)))
+ppDecl (DeclType _ n t) = return (render $ sep [defColor (pretty "type")
+                                               , name2doc n
+                                               , defColor (pretty "=")
+                                               , ty2doc t])
 

@@ -1,31 +1,50 @@
-let pred = fun (n:Nat) -> n - 1
+let pred : Nat -> Nat = fun (n:Nat) -> n - 1
+let preds (n : Nat) : Nat = n - 1
 
-let suc = fun (n:Nat) -> n + 1 
+let suc : Nat -> Nat = fun (n:Nat) -> n + 1 
+let sucs (n : Nat) : Nat = n + 1
 
-let suma = fix(suma : Nat -> Nat -> Nat) (m:Nat) -> fun(n:Nat) -> ifz n then m else suc (suma m (pred n))
+let suma : Nat -> Nat -> Nat = fix(suma : Nat -> Nat -> Nat) (m:Nat) -> fun(n:Nat) -> ifz n then m else suc (suma m (pred n))
+let rec sumas (m : Nat) (n : Nat) : Nat = ifz n then m else sucs (sumas m (preds n))
 
-let resta = fix(resta : Nat -> Nat -> Nat) (m:Nat) -> fun(n:Nat) -> ifz n then m else pred (resta m (pred n))
+let resta : Nat -> Nat -> Nat = fix(resta : Nat -> Nat -> Nat) (m:Nat) -> fun(n:Nat) -> ifz n then m else pred (resta m (pred n))
+let rec restas (m : Nat) (n : Nat) : Nat = ifz n then m else preds (restas m (pred n))
 
-let mult = fix(mult : Nat -> Nat -> Nat) (m:Nat) -> fun(n:Nat) -> ifz n then 0 else suma m  (mult m (pred n))
+let mult : Nat -> Nat -> Nat = fix(mult : Nat -> Nat -> Nat) (m:Nat) -> fun(n:Nat) -> ifz n then 0 else suma m  (mult m (pred n))
+let rec mults (m : Nat) (n : Nat) : Nat = ifz n then 0 else m + (mults m (n - 1))
 
-let exp = fix(exp : Nat -> Nat -> Nat) (m:Nat) -> fun(n:Nat) -> ifz n then 1 else mult m  (exp m (pred n))
+let exp : Nat -> Nat -> Nat = fix(exp : Nat -> Nat -> Nat) (m:Nat) -> fun(n:Nat) -> ifz n then 1 else mult m  (exp m (pred n))
+let rec exps (m : Nat) (n : Nat) : Nat = ifz n then 1 else mults m  (exps m (preds n))
 
-let fact = fix(fact : Nat -> Nat) (n:Nat) -> ifz n then 1 else mult n (fact (pred n))
+let fact : Nat -> Nat = fix(fact : Nat -> Nat) (n:Nat) -> ifz n then 1 else mult n (fact (pred n))
+let rec facts (n : Nat) : Nat = ifz n then 1 else mult n (fact (pred n))
 
-let true = 1
+type Bool = Nat
+let true : Bool = 1
+let false : Bool = 0
 
-let false = 0
+let ifthenelse : Nat -> Nat -> Nat -> Nat = fun(x:Nat) -> fun(t:Nat) -> fun(f:Nat) -> ifz x then f else t
+let ifthenelses (x : Bool) (t : Nat) (f : Nat) : Nat = ifz x then f else t
 
-let ifthenelse = fun(x:Nat) -> fun(t:Nat) -> fun(f:Nat) -> ifz x then f else t
+type Pair = Bool -> Nat
 
-let pair = fun (x:Nat) -> fun (y:Nat) -> fun (n:Nat) -> ifthenelse n x y
-let proj1 = fun (p: Nat -> Nat) -> p true
-let proj2 = fun (p: Nat -> Nat) -> p false
+let pair : Nat -> Nat -> Nat -> Nat = fun (x:Nat) -> fun (y:Nat) -> fun (n:Nat) -> ifthenelse n x y
+let pairs (x : Nat) (y : Nat) (f : Bool) : Nat = ifthenelse f x y
 
-let gcd = fix(gcd:Nat -> Nat -> Nat)(m:Nat) -> fun (n:Nat) -> ifz n then m else (ifz m then n else (ifz resta n m then (gcd (resta m n) n) else (gcd m (resta n m))))
+let proj1 : (Nat -> Nat) -> Nat = fun (p: Nat -> Nat) -> p true
+let proj1s (p : Pair) : Nat = p true
 
-let R = fun (z:Nat) -> fun (s : Nat -> Nat -> Nat) -> fix (f: Nat -> Nat) (n:Nat) -> ifz n then z else s (f (pred n)) (pred n)
+let proj2 : (Nat -> Nat) -> Nat = fun (p: Nat -> Nat) -> p false
+let proj2s (p : Pair) : Nat = p false
 
-let suma2 = fun(x:Nat) -> fun(y:Nat )-> R y (fun (w:Nat) -> fun (z:Nat) -> suc w) x 
+let gcd : Nat -> Nat -> Nat = fix(gcd:Nat -> Nat -> Nat)(m:Nat) -> fun (n:Nat) -> ifz n then m else (ifz m then n else (ifz resta n m then (gcd (resta m n) n) else (gcd m (resta n m))))
+let rec gcds (m : Nat) (n : Nat) : Nat = ifz n then m else (ifz m then n else (ifz resta n m then (gcd (resta m n) n) else (gcd m (resta n m))))
 
-let min = fun (f:Nat -> Nat) -> (fix(min : Nat -> Nat) (n:Nat) -> ifz (f n) then n else min (suc n)) 0
+let R : Nat -> (Nat -> Nat -> Nat) -> Nat -> Nat = fun (z:Nat) -> fun (s : Nat -> Nat -> Nat) -> fix (f: Nat -> Nat) (n:Nat) -> ifz n then z else s (f (pred n)) (pred n)
+let Rs (z : Nat) (s : Nat -> Nat -> Nat) : Nat -> Nat = fix (f: Nat -> Nat) (n:Nat) -> ifz n then z else s (f (pred n)) (pred n)
+
+let suma2 : Nat -> Nat -> Nat = fun(x:Nat) -> fun(y:Nat )-> R y (fun (w:Nat) -> fun (z:Nat) -> suc w) x 
+let suma2s (x : Nat) (y : Nat) : Nat = R y (fun (w:Nat) -> fun (z:Nat) -> suc w) x 
+
+let min : (Nat -> Nat) -> Nat = fun (f:Nat -> Nat) -> (fix(min : Nat -> Nat) (n:Nat) -> ifz (f n) then n else min (suc n)) 0
+let mins (f : Nat -> Nat) : Nat = (fix(min : Nat -> Nat) (n:Nat) -> ifz (f n) then n else min (suc n)) 0
