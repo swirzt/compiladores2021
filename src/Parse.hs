@@ -113,6 +113,16 @@ printOp = do
   a <- atom
   return (SPrint i str a)
 
+printEta :: P STerm
+printEta = do
+  i <- getPos
+  reserved "print"
+  str <- option "" stringLiteral
+  return (SPrintEta i str)
+
+printParse :: P STerm
+printParse = try printOp <|> printEta
+
 binary :: String -> BinaryOp -> Assoc -> Operator String () Identity STerm
 binary s f = Ex.Infix (reservedOp s >> return (SBinaryOp NoPos f))
 
@@ -131,7 +141,7 @@ atom =
   (flip SConst <$> const <*> getPos)
     <|> flip SV <$> var <*> getPos
     <|> parens expr
-    <|> printOp
+    <|> printParse
 
 -- parsea un par (variable : tipo)
 binding :: P (Name, STy)
@@ -190,9 +200,6 @@ ifz = do
   e <- expr
   return (SIfZ i c t e)
 
--- let x:Nat = 5 in x + 1
--- do {try v <- var; reservedOp ":"; ty <- typeP; reservedOp "="; def <- expr; reserved "in"; body <- expr; return }
-
 parseDef :: P (Name, [(Name, STy)], STy)
 parseDef = do
   v <- var
@@ -209,14 +216,6 @@ letexp' i b = do
   reserved "in"
   body <- expr
   return (SLet i v mvars ty def body b)
-
--- letexp :: P STerm
--- letexp = do
---   i <- getPos
---   reserved "let"
---   (do reserved "rec"
---       letexp' i True
---       <|> letexp' i False)
 
 letexp :: P STerm
 letexp =
@@ -235,7 +234,7 @@ letexp =
 
 -- | Parser de términos
 tm :: P STerm
-tm = app <|> lam <|> ifz <|> printOp <|> fix <|> letexp
+tm = app <|> lam <|> ifz <|> printParse <|> fix <|> letexp
 
 decl :: P (SDecl STerm)
 decl = do

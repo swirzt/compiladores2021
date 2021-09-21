@@ -26,19 +26,19 @@ data Ty
   deriving (Show)
 
 instance Eq Ty where
-  NatTy == NatTy         = True
-  NatTy == FunTy _ _     = False
-  FunTy _ _ == NatTy     = False
+  NatTy == NatTy = True
+  NatTy == FunTy _ _ = False
+  FunTy _ _ == NatTy = False
   FunTy x y == FunTy w z = x == w && y == z
-  NameTy n t == x        = t == x
-  x == NameTy n t        = x == t
+  NameTy n t == x = t == x
+  x == NameTy n t = x == t
 
 -- | AST de Tipos con Sugar
 data STy
   = SNatTy
   | SFunTy STy STy
   | SVarTy String
-  deriving Show
+  deriving (Show)
 
 type Name = String
 
@@ -49,14 +49,14 @@ data BinaryOp = Add | Sub
   deriving (Show)
 
 -- | tipo de datos de declaraciones, parametrizado por el tipo del cuerpo de la declaración
-data Decl a = 
-  DeclType Pos Name Ty
+data Decl a
+  = DeclType Pos Name Ty
   | DeclFun
-  { declPos :: Pos,
-    declName :: Name,
-    declType :: Ty,
-    declBody :: a
-  }
+      { declPos :: Pos,
+        declName :: Name,
+        declType :: Ty,
+        declBody :: a
+      }
   deriving (Show, Functor)
 
 data SDecl a
@@ -93,6 +93,7 @@ data STm info var
   | SLam info [(Name, STy)] (STm info var)
   | SApp info (STm info var) (STm info var)
   | SPrint info String (STm info var)
+  | SPrintEta info String
   | SBinaryOp info BinaryOp (STm info var) (STm info var)
   | SFix info Name STy [(Name, STy)] (STm info var)
   | SIfZ info (STm info var) (STm info var) (STm info var)

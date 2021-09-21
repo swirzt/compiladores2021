@@ -34,6 +34,7 @@ desugar (SApp info stm1 stm2) = do
 desugar (SPrint info str stm) = do
   stmDesugar <- desugar stm
   return $ Print info str stmDesugar
+desugar (SPrintEta info str) = desugar $ SLam info [("x", SNatTy)] (SPrint info str (SV info "x"))
 desugar (SBinaryOp info b stm1 stm2) = do
   stm1Desugar <- desugar stm1
   stm2Desugar <- desugar stm2
@@ -61,11 +62,11 @@ desugar (SLet info f [] lty stmt stmt' False) = do
   return $ Let info f tyDesugar stmtDesugar stmtDesugar'
 desugar (SLet info _ [] _ _ _ True) = failPosFD4 info "Falta el argumento del fix"
 desugar (SLet info f [(n, sty)] lty stmt stmt' True) = do
-  stmtDesugar <- desugar $ SFix info f (SFunTy sty lty) [(n, sty)] stmt
+  let fixType = SFunTy sty lty
+  stmtDesugar <- desugar $ SFix info f fixType [(n, sty)] stmt
   stmtDesugar' <- desugar stmt'
-  styDesugar <- desugarTy sty
-  ltyDesugar <- desugarTy lty
-  return $ Let info f (FunTy styDesugar ltyDesugar) stmtDesugar stmtDesugar'
+  fixTyDesugar <- desugarTy fixType
+  return $ Let info f fixTyDesugar stmtDesugar stmtDesugar'
 desugar (SLet info f ((n, sty) : xs) lty stmt stmt' True) = desugar $ SLet info f [(n, sty)] (concatTy xs lty) (SLam info xs stmt) stmt' True
 desugar (SLet info f xs lty stmt stmt' False) = do
   stmtDesugar' <- desugar stmt'
@@ -132,5 +133,5 @@ desugarDecl (SDeclFun pos name vars ty def False) = do
     _ -> return $ DeclFun pos name tyDesugar (SLam pos vars def)
 desugarDecl (SDeclFun pos name vars ty def True) = do
   tyDesugar <- deconcatTy vars ty
-  return $ DeclFun pos name tyDesugar (SFix pos name ty vars def)
+  return $ DeclFun pos name tyDesugar (SFix pos name (concatTy vars ty) vars def)
 desugarDecl _ = failFD4 "Si llegué acá algo esta mal jej"
