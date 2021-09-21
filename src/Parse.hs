@@ -163,13 +163,11 @@ lam = do
 
 -- Nota el parser app también parsea un solo atom.
 app :: P STerm
-app =
-  ( do
-      i <- getPos
-      f <- atom
-      args <- many atom
-      return (foldl (SApp i) f args)
-  )
+app = do
+  i <- getPos
+  f <- atom
+  args <- many atom
+  return (foldl (SApp i) f args)
 
 fix :: P STerm
 fix = do
@@ -277,7 +275,7 @@ program = many decl
 -- | Parsea una declaración a un término
 -- Útil para las sesiones interactivas
 declOrTm :: P (Either (SDecl STerm) STerm)
-declOrTm = try (Right <$> expr) <|> (Left <$> decl) 
+declOrTm = try (Right <$> expr) <|> (Left <$> decl)
 
 -- Corre un parser, chequeando que se pueda consumir toda la entrada
 runP :: P a -> String -> String -> Either ParseError a
