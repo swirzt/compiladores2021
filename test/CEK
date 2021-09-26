@@ -10,7 +10,7 @@ print E
 let var = E in t
 let var = v in E
 
-Marcos:
+Marcos CK:
 fr ::= ☐ t | v ☐ | ifz ☐ then t else e | ☐ ⊕ t | v ⊕ ☐ | print str ☐ | let x = ☐ in t
 
 Maquina CK:
@@ -36,3 +36,27 @@ Marcos CEK:
 
 fr ::= ρ.☐ t | clos ☐ | ρ.ifz ☐ then t else e | ρ.☐ ⊕ t | v ⊕ ☐ | print str ☐ | let x = ☐ in t
 Let no se modifica porque el entorno no me afecta, ρ se va a modificar cuando entre a t
+
+Maquina CEK:
+
+<print s t, ρ ,k> -> <t, ρ ,print s ☐ ≻ k >
+<t \oplus u, ρ ,k> -> <t, ρ ,ρ . ☐ ⊕ u ≻ k>
+<ifz c then t else e, ρ ,k> -> <c, ρ . if ☐ then t else e ≻ k>
+<t u, ρ ,k> -> <t, ρ, ρ . ☐ u ≻ k>
+<x,ρ,k> -> <<ρ(z),k>>
+<n,ρ,k> -> <<n, k>>
+<fun x.t, ρ, k> -> <<clos_fun(ρ,x,t), k>>
+<fix f x.t, ρ, k> -> <<clos_fix(ρ,f,x,t), k>>
+<let var = t in t', ρ ,k> -> <t, ρ ,let var = ☐ in t' ≻ k>
+
+
+
+<<n , print s ☐ ≻ k>> -> <<n,k>>
+<<n, ρ . ☐ ⊕ u ≻ k >> -> <n , ρ, n ⊕ ☐ ≻ k>
+<< n', n ⊕ ☐ ≻ k >> -> << n ⊕ n' , k >>
+<<0, ρ . ifz ☐ then t else e ≻ k>> -> <t, ρ, k>
+<<np, ρ . ifz ☐ then t else e ≻ k>> -> <e, ρ, k>
+<<clos, ρ . ☐ t ≻ k>> -> <t, ρ, clos ☐ ≻ k>
+<<v, (closfun(ρ, x, t)) ☐ ≻ k >> -> < t, ρ[x ↦ v], k>
+<<v, (closfix(ρ, f, x, t)) ☐ ≻ k >> -> <t, ρ[f ↦ closfix(ρ, f, x, t), x ↦ v], k>
+<<v, let x = ☐ in t ≻ k >> -> <t, ρ[x ↦ v], k>
