@@ -27,21 +27,21 @@ data Frame
 type Kont = [Frame]
 
 search :: MonadFD4 m => Term -> Env -> Kont -> m Val
-search (Print info str t) env kont = search t env (FPrint str : kont)
-search (BinaryOp info op t t') env kont = search t env (FOpL env op t' : kont)
-search (IfZ info t true false) env kont = search t env (FIfz env true false : kont)
-search (App info t t') env kont = search t env (FAppL env t' : kont)
-search (V info (Bound i)) env kont = destroy (env !! i) kont
+search (Print _ str t) env kont = search t env (FPrint str : kont)
+search (BinaryOp _ op t t') env kont = search t env (FOpL env op t' : kont)
+search (IfZ _ t true false) env kont = search t env (FIfz env true false : kont)
+search (App _ t t') env kont = search t env (FAppL env t' : kont)
+search (V _ (Bound i)) env kont = destroy (env !! i) kont
 search (V info (Global i)) env kont = do
   val <- lookupDecl i
   case val of
     Just x -> search x env kont
     Nothing -> failPosFD4 info "Error al evaluar el marco de V, variable indefinida"
-search (V info (Free i)) env kont = failPosFD4 info "Preguntarle a Mauro"
-search (Const info (CNat c)) env kont = destroy (Num c) kont
-search f@(Lam info name ty t) env kont = destroy (Clos $ close f env) kont
-search f@(Fix info fname fty xname xty t) env kont = destroy (Clos $ close f env) kont
-search (Let info x xty t t') env kont = search t env (FLet env t' : kont)
+search (Const _ (CNat c)) env kont = destroy (Num c) kont
+search f@(Lam _ _ _ _) env kont = destroy (Clos $ close f env) kont
+search f@(Fix _ _ _ _ _ _) env kont = destroy (Clos $ close f env) kont
+search (Let _ _ _ t t') env kont = search t env (FLet env t' : kont)
+search (V _ (Free _)) _ _ = undefined -- Para que el linter no moleste, no debería pasar
 
 close :: Term -> Env -> ClosCEK
 close f@(Lam _ _ _ t) env = ClosFun env t f
