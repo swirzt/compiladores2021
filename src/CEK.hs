@@ -9,7 +9,7 @@ import Prelude
 data Val = Num Int | Clos ClosCEK
   deriving (Show)
 
-data ClosCEK = ClosFun Env Term Term | ClosFix Env Name Term Term --El segundo Term es para reconstruir la funcion
+data ClosCEK = ClosFun Env Term Term | ClosFix Env Term Term --El segundo Term es para reconstruir la funcion
   deriving (Show)
 
 type Env = [Val]
@@ -45,14 +45,13 @@ search (V _ (Free _)) _ _ = undefined -- Para que el linter no moleste, no deber
 
 close :: Term -> Env -> ClosCEK
 close f@(Lam _ _ _ t) env = ClosFun env t f
-close f@(Fix _ fname fty xname xty t) env = ClosFix env fname t f
+close f@(Fix _ _ _ _ _ t) env = ClosFix env t f
 close _ _ = undefined -- Para que el linter no moleste
 
 destroy :: MonadFD4 m => Val -> Kont -> m Val
 destroy n@(Num m) (FPrint s : xs) = do
   printFD4 $ s ++ show m
   destroy n xs
-destroy v (FPrint s : xs) = failFD4 "Error, quise imprimir un fun o fix."
 destroy (Num n) (FOpL e op tm : xs) = search tm e (FOpR n op : xs)
 destroy (Num m) (FOpR x op : xs) = case op of
   Add -> destroy (Num $ x + m) xs
@@ -62,15 +61,16 @@ destroy (Num _) (FIfz e t1 t2 : xs) = search t2 e xs
 destroy (Clos clos) (FAppL e tm : xs) = search tm e (FAppR clos : xs)
 destroy v (FAppR clos : xs) = case clos of
   ClosFun e tm _ -> search tm (v : e) xs
-  a@(ClosFix e tmf tmx _) -> search tmx (v : Clos a : e) xs
+  a@(ClosFix e tmx _) -> search tmx (v : Clos a : e) xs
 destroy v (FLet e tm : xs) = search tm (v : e) xs
 destroy v [] = return v
+destroy v (FPrint s : xs) = failFD4 "Error, quise imprimir un fun o fix." -- Creo que este no es necesario, daría error de tipo antes
 destroy x k = undefined -- Para que el linter no moleste
 
 open :: Val -> Term
 open (Num c) = Const NoPos (CNat c)
 open (Clos (ClosFun _ _ f)) = f
-open (Clos (ClosFix _ _ _ f)) = f
+open (Clos (ClosFix _ _ f)) = f
 
 evalCEK :: MonadFD4 m => Term -> m Term
 evalCEK t = do
