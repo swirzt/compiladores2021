@@ -19,6 +19,7 @@ module MonadFD4
     lookupTy,
     lookupTyDef,
     printFD4,
+    printFD4Debug,
     setLastFile,
     getLastFile,
     eraseLastFileDecls,
