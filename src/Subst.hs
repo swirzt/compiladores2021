@@ -102,13 +102,9 @@ global2Free (Lam info name ty tm) = Lam info name ty $ global2Free tm
 global2Free (App info tm1 tm2) = App info (global2Free tm1) (global2Free tm2)
 global2Free (Print info str tm) = Print info str $ global2Free tm
 global2Free (BinaryOp info op tm1 tm2) = BinaryOp info op (global2Free tm1) (global2Free tm2)
-global2Free (Fix info name1 t1 name2 ty2 tm) = let tm' = global2Free tm in (Fix info name1 t1 name2 ty2 tm')
-global2Free (IfZ info tm tt tf) =
-  let tmm = global2Free tm
-      tmt = global2Free tt
-      tmf = global2Free tmf
-   in (IfZ info tmm tmt tmf)
+global2Free (Fix info name1 t1 name2 ty2 tm) = Fix info name1 t1 name2 ty2 (global2Free tm)
+global2Free (IfZ info tm tt tf) = IfZ info (global2Free tm) (global2Free tt) (global2Free tf)
 global2Free (Let info name ty tm1 tm2) =
   let tm1' = global2Free tm1
       tm2' = global2Free tm2
-   in (Let info name ty tm1' tm2')
+   in Let info name ty tm1' tm2'

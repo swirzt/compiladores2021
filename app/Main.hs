@@ -37,7 +37,6 @@ import PPrint ( pp , ppTy, ppDecl )
 import MonadFD4
 import TypeChecker ( tc, tcDecl )
 import CEK
-import LLVM.AST.Type (fp128, FloatingPointType (X86_FP80FP))
 import Bytecompile (bytecompileModule, bcWrite, bcRead, runBC)
 
 prompt :: String

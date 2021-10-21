@@ -12,7 +12,6 @@
 -- para ejecutar bytecode.
 module Bytecompile (Bytecode, runBC, bcWrite, bcRead, bytecompileModule) where
 
-import Control.Monad.Identity (Monad)
 import Data.Binary (Binary (get, put), Word32, decode, encode)
 import Data.Binary.Get (getWord32le, isEmpty)
 import Data.Binary.Put (putWord32le)
@@ -123,7 +122,14 @@ bc (Let _ _ _ tm1 tm2) = do
   ts1 <- bc tm1
   ts2 <- bc tm2
   return $ ts1 ++ [SHIFT] ++ ts2 ++ [DROP]
-bc (IfZ _ tmb tmt tmf) = undefined
+bc (IfZ _ tmb tmt tmf) = do
+  tsb <- bc tmb
+  tst <- bc tmt
+  tsf <- bc tmf
+  let bLen = length tsb
+  let tLen = length tst
+  let fLen = length tsf
+  return $ tsb ++ [IFZ, tLen, fLen] ++ tst ++ tsf
 bc (V _ (Free name)) = undefined
 bc (V _ (Global n)) = undefined
 
@@ -139,7 +145,6 @@ bytecompileModule :: MonadFD4 m => Module -> m Bytecode
 bytecompileModule xs = do
   tm <- declToLet xs
   tm' <- closeLet tm
-  -- printFD4Debug tm'
   ys <- bc tm'
   return $ ys ++ [PRINTN, STOP]
 
@@ -226,7 +231,17 @@ runBC' (PRINT : c) e s = do
 runBC' (FIX : c) e (Fun ef cf : s) = let efix = Fun efix cf : e in runBC' c e (Fun efix cf : s)
 runBC' (FIX : c) _ _ = failFD4 "Error al ejecutar FIX"
 runBC' (STOP : _) _ _ = return ()
+runBC' (IFZ : tLen : fLen : c) e (I n : s) =
+  if n == 0
+    then runBC' (takeDrop tLen fLen c) e s
+    else runBC' (drop tLen c) e s
+runBC' (IFZ : _) _ _ = failFD4 "Error al ejecutar IFZ"
 runBC' _ _ _ = failFD4 "Pasaron cosas"
+
+takeDrop :: Int -> Int -> [a] -> [a]
+takeDrop 0 m xs = drop m xs
+takeDrop n m (x : xs) = x : takeDrop (n - 1) m xs
+takeDrop _ _ _ = undefined
 
 unpackBytecode :: MonadFD4 m => Bytecode -> m (Bytecode, Bytecode)
 unpackBytecode (NULL : xs) = return ([], xs)
