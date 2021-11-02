@@ -19,6 +19,7 @@ module MonadFD4
     lookupTy,
     lookupTyDef,
     printFD4,
+    printFD4noN,
     printFD4Debug,
     setLastFile,
     getLastFile,
@@ -125,6 +126,9 @@ catchErrors c =
           hPutStrLn stderr (show e)
             >> return Nothing
     )
+
+printFD4noN :: MonadFD4 m => String -> m ()
+printFD4noN = liftIO . putStr
 
 ----
 -- Importante, no eta-expandir porque GHC no hace una

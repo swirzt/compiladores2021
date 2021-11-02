@@ -91,13 +91,17 @@ pattern PRINT = 13
 
 pattern PRINTN = 14
 
+pattern SKIP = 15
+
+pattern TAILCALL = 16
+
 bc :: MonadFD4 m => Term -> m Bytecode
 bc (V _ (Bound i)) = return [ACCESS, i]
 bc (Const _ (CNat n)) = return [CONST, n]
 bc (Lam _ _ _ tm) = do
-  ts <- bc tm
-  let len = length ts + 1
-  return $ [FUNCTION, len] ++ ts ++ [RETURN]
+  ts <- bt tm
+  let len = length ts
+  return $ [FUNCTION, len] ++ ts
 bc (App _ tm1 tm2) = do
   ts1 <- bc tm1
   ts2 <- bc tm2
@@ -105,7 +109,7 @@ bc (App _ tm1 tm2) = do
 bc (Print _ str tm) = do
   ts <- bc tm
   let itr = stringToUnicode str
-  return $ [PRINT] ++ itr ++ [NULL] ++ ts ++ [PRINTN]
+  return $ ts ++ [PRINT] ++ itr ++ [NULL, PRINTN]
 bc (BinaryOp _ op tm1 tm2) = do
   ts1 <- bc tm1
   ts2 <- bc tm2
@@ -115,9 +119,9 @@ bc (BinaryOp _ op tm1 tm2) = do
     parseOp Add = ADD
     parseOp Sub = SUB
 bc (Fix _ _ _ _ _ tm) = do
-  ts <- bc tm
-  let len = length ts + 1
-  return $ [FUNCTION, len] ++ ts ++ [RETURN, FIX]
+  ts <- bt tm
+  let len = length ts
+  return $ [FUNCTION, len] ++ ts ++ [FIX]
 bc (Let _ _ _ tm1 tm2) = do
   ts1 <- bc tm1
   ts2 <- bc tm2
@@ -126,12 +130,31 @@ bc (IfZ _ tmb tmt tmf) = do
   tsb <- bc tmb
   tst <- bc tmt
   tsf <- bc tmf
-  let bLen = length tsb
-  let tLen = length tst
+  let tLen = length tst + 2 -- Tengo que saltear el SKIP y el largo del False
   let fLen = length tsf
-  return $ tsb ++ [IFZ, tLen, fLen] ++ tst ++ tsf
+  return $ tsb ++ [IFZ, tLen] ++ tst ++ [SKIP, fLen] ++ tsf
 bc (V _ (Free name)) = undefined
 bc (V _ (Global n)) = undefined
+
+bt :: MonadFD4 m => Term -> m Bytecode
+bt (App _ tm1 tm2) = do
+  ts1 <- bc tm1
+  ts2 <- bc tm2
+  return $ ts1 ++ ts2 ++ [TAILCALL]
+bt (IfZ _ tmb tmt tmf) = do
+  tsb <- bc tmb
+  tst <- bt tmt
+  tsf <- bt tmf
+  let tLen = length tst
+  let fLen = length tsf
+  return $ tsb ++ [IFZ, tLen] ++ tst ++ tsf
+bt (Let _ _ _ tm1 tm2) = do
+  ts1 <- bc tm1
+  ts2 <- bt tm2
+  return $ ts1 ++ [SHIFT] ++ ts2
+bt t = do
+  tt <- bc t
+  return $ tt ++ [RETURN]
 
 stringToUnicode :: String -> [Int]
 stringToUnicode xs = map ord xs
@@ -223,29 +246,26 @@ runBC' (PRINTN : c) e st@(I n : s) = do
   printFD4 (show n)
   runBC' c e st
 runBC' (PRINTN : _) _ _ = failFD4 "Error al ejecutar PRINTN"
-runBC' (PRINT : c) e s = do
-  (itr, c') <- unpackBytecode c
-  let str = unicodeToString itr
-  printFD4 str
-  runBC' c' e s
+runBC' (PRINT : c) e s = printStr [] c e s
 runBC' (FIX : c) e (Fun ef cf : s) = let efix = Fun efix cf : e in runBC' c e (Fun efix cf : s)
 runBC' (FIX : c) _ _ = failFD4 "Error al ejecutar FIX"
 runBC' (STOP : _) _ _ = return ()
-runBC' (IFZ : tLen : fLen : c) e (I n : s) =
+runBC' (IFZ : tLen : c) e (I n : s) =
   if n == 0
-    then runBC' (takeDrop tLen fLen c) e s
+    then runBC' c e s
     else runBC' (drop tLen c) e s
 runBC' (IFZ : _) _ _ = failFD4 "Error al ejecutar IFZ"
+runBC' (SKIP : len : c) e s = runBC' (drop len c) e s
+runBC' (TAILCALL : c) e (v : Fun ef cf : s) = runBC' cf (v : ef) s
+runBC' (TAILCALL : _) _ _ = failFD4 "Error al ejecutar TAILCALL"
 runBC' _ _ _ = failFD4 "Pasaron cosas"
 
-takeDrop :: Int -> Int -> [a] -> [a]
-takeDrop 0 m xs = drop m xs
-takeDrop n m (x : xs) = x : takeDrop (n - 1) m xs
-takeDrop _ _ _ = undefined
-
-unpackBytecode :: MonadFD4 m => Bytecode -> m (Bytecode, Bytecode)
-unpackBytecode (NULL : xs) = return ([], xs)
-unpackBytecode (x : xs) = do
-  (x', xs') <- unpackBytecode xs
-  return (x : x', xs')
-unpackBytecode _ = failFD4 "Error al desarmar una cadena"
+printStr :: MonadFD4 m => Bytecode -> Bytecode -> Env -> Stack -> m ()
+printStr xs (NULL : c) e s = do
+  printFD4noN str
+  runBC' c e s
+  where
+    ys = reverse xs
+    str = unicodeToString ys
+printStr xs (char : c) e s = printStr (char : xs) c e s
+printStr _ _ _ _ = failFD4 "Error al desarmar la cadena"

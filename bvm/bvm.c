@@ -8,7 +8,7 @@
 #include <fcntl.h>
 #include <stdint.h>
 #include <inttypes.h>
-#include <gc.h>
+#include <gc/gc.h>
 #include <wchar.h>
 #include <locale.h>
 
@@ -60,7 +60,7 @@
 #define DROP     12
 #define PRINT    13
 #define PRINTN   14
-#define JUMP     15
+#define SKIP     15
 #define TAILCALL 16
 
 #define CHUNK 4096
@@ -284,16 +284,38 @@ void run(code init_c)
 			break;
 		}
 
-/*
 		case TAILCALL: {
+			/* Aplicación de cola: tenemos en la pila un argumento
+			 * y una función. La función debe ser una clausura.
+			 * La idea es saltar a la clausura extendiendo su
+			 * entorno con el valor de la aplicación, pero
+			 * no guardamos nuestra dirección de retorno.
+			 */
+			value arg = *--s;
+			value fun = *--s;
+
+			/* Cambiamos al entorno de la clausura, agregando arg */
+			e = env_push(fun.clo.clo_env, arg);
+
+			/* Saltamos! */
+			c = fun.clo.clo_body;
+
+			break;
 		}
-*/
+
 		case IFZ: {
-			quit("IFZ no implementado");
+			value n = *--s;
+			if (!n.i) {
+				c++;
+			}
+			else {
+				int offset = *c++;
+				c += offset;
+			}
 			break;
         }
         
-		case JUMP: {
+		case SKIP: {
 			int offset = *c++;
 			c += offset;
 			break;
@@ -364,7 +386,7 @@ void run(code init_c)
 
 		case PRINTN: {
 			uint32_t i = s[-1].i;
-			printf("%" PRIu32 "\n", i);
+			wprintf(L"%" PRIu32 "\n", i);
 			break;
 		}
 

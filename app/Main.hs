@@ -38,6 +38,7 @@ import MonadFD4
 import TypeChecker ( tc, tcDecl )
 import CEK
 import Bytecompile (bytecompileModule, bcWrite, bcRead, runBC)
+import System.FilePath.Windows (replaceExtension)
 
 prompt :: String
 prompt = "FD4> "
@@ -326,7 +327,7 @@ bytecompileFile :: MonadFD4 m => FilePath -> m ()
 bytecompileFile fp = do xs <- loadFile fp
                         ys <- mapM typecheckDecl xs
                         byte <- bytecompileModule ys
-                        liftIO $ bcWrite byte (fp ++ ".o")
+                        liftIO $ bcWrite byte (replaceExtension fp ".o")
                         return ()
 
 
