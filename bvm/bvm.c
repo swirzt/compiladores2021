@@ -8,7 +8,7 @@
 #include <fcntl.h>
 #include <stdint.h>
 #include <inttypes.h>
-#include <gc/gc.h>
+#include <gc.h>
 #include <wchar.h>
 #include <locale.h>
 
