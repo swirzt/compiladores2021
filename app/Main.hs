@@ -37,6 +37,8 @@ import PPrint ( pp , ppTy, ppDecl )
 import MonadFD4
 import TypeChecker ( tc, tcDecl )
 import CEK
+import Bytecompile (bytecompileModule, bcWrite, bcRead, runBC)
+import System.FilePath.Windows (replaceExtension)
 
 prompt :: String
 prompt = "FD4> "
@@ -48,8 +50,8 @@ data Mode =
     Interactive
   | Typecheck
   | InteractiveCEK
-  -- | Bytecompile 
-  -- | RunVM
+  | Bytecompile 
+  | RunVM
   -- | CC
   -- | Canon
   -- | LLVM
@@ -60,8 +62,8 @@ parseMode :: Parser (Mode,Bool)
 parseMode = (,) <$>
       (flag' Typecheck ( long "typecheck" <> short 't' <> help "Chequear tipos e imprimir el término")
       <|> flag' InteractiveCEK (long "interactiveCEK" <> short 'k' <> help "Ejecutar interactivamente en la CEK")
-  -- <|> flag' Bytecompile (long "bytecompile" <> short 'm' <> help "Compilar a la BVM")
-  -- <|> flag' RunVM (long "runVM" <> short 'r' <> help "Ejecutar bytecode en la BVM")
+      <|> flag' Bytecompile (long "bytecompile" <> short 'm' <> help "Compilar a la BVM")
+      <|> flag' RunVM (long "runVM" <> short 'r' <> help "Ejecutar bytecode en la BVM")
       <|> flag Interactive Interactive ( long "interactive" <> short 'i' <> help "Ejecutar en forma interactiva")
   -- <|> flag' CC ( long "cc" <> short 'c' <> help "Compilar a código C")
   -- <|> flag' Canon ( long "canon" <> short 'n' <> help "Imprimir canonicalización")
@@ -93,10 +95,10 @@ main = execParser opts >>= go
     go (InteractiveCEK,_, files) =
               do runFD4 (runInputT defaultSettings (repl files InteractiveCEK))
                  return () --Consultar si esto esta bien
-    -- go (Bytecompile,_, files) =
-    --           runOrFail $ mapM_ bytecompileFile files
-    -- go (RunVM,_,files) =
-    --           runOrFail $ mapM_ bytecodeRun files
+    go (Bytecompile,_, files) =
+              runOrFail $ mapM_ bytecompileFile files
+    go (RunVM,_,files) =
+              runOrFail $ mapM_ bytecodeRun files
     -- go (CC,_, files) =
     --           runOrFail $ mapM_ ccFile files
     -- go (Canon,_, files) =
@@ -278,6 +280,7 @@ compilePhrase x mode = do dot <- parseIO "<interactive>" declOrTm x
                            Right t -> case mode of
                                         Interactive -> handleTerm t
                                         InteractiveCEK -> handleTermCEK t
+                                        _ -> undefined -- para que no me moleste el linter
 
 handleTerm ::  MonadFD4 m => STerm -> m ()
 handleTerm t = do
@@ -318,3 +321,16 @@ typeCheckPhrase x = do
          s <- get
          ty <- tc tt (tyEnv s)
          printFD4 (ppTy ty)
+
+
+bytecompileFile :: MonadFD4 m => FilePath -> m ()
+bytecompileFile fp = do xs <- loadFile fp
+                        ys <- mapM typecheckDecl xs
+                        byte <- bytecompileModule ys
+                        liftIO $ bcWrite byte (replaceExtension fp ".o")
+                        return ()
+
+
+bytecodeRun :: MonadFD4 m => FilePath -> m()
+bytecodeRun fp = do file <- liftIO $ bcRead fp
+                    runBC file

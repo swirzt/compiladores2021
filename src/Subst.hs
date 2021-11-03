@@ -1,62 +1,63 @@
-{-|
-Module      : Subst
-Description : Define las operaciones de la representacion locally nameless
-Copyright   : (c) Mauro Jaskelioff, Guido Martínez, 2020.
-License     : GPL-3
-Maintainer  : mauro@fceia.unr.edu.ar
-Stability   : experimental
-
-Este módulo define las operaciones de la representacion locally nameless,
-y la substitución.
-
--}
-
-
+-- |
+-- Module      : Subst
+-- Description : Define las operaciones de la representacion locally nameless
+-- Copyright   : (c) Mauro Jaskelioff, Guido Martínez, 2020.
+-- License     : GPL-3
+-- Maintainer  : mauro@fceia.unr.edu.ar
+-- Stability   : experimental
+--
+-- Este módulo define las operaciones de la representacion locally nameless,
+-- y la substitución.
 module Subst where
 
-import Lang
 import Common
-import Data.List ( elemIndex )
+import Data.List (elemIndex)
+import Lang
 
-
-varChanger :: (Int -> Pos -> Name -> Term) --que hacemos con las variables localmente libres
-           -> (Int -> Pos -> Int ->  Term) --que hacemos con los indices de De Bruijn
-           -> Term -> Term
-varChanger local bound t = go 0 t where
-  go n   (V p (Bound i)) = bound n p i
-  go n   (V p (Free x)) = local n p x 
-  go n   (V p (Global x)) = V p (Global x) 
-  go n (Lam p y ty t)   = Lam p y ty (go (n+1) t)
-  go n (App p l r)   = App p (go n l) (go n r)
-  go n (Fix p f fty x xty t) = Fix p f fty x xty (go (n+2) t)
-  go n (IfZ p c t e) = IfZ p (go n c) (go n t) (go n e)
-  go n t@(Const _ _) = t
-  go n (Print p str t) = Print p str (go n t)
-  go n (BinaryOp p op t u) = BinaryOp p op (go n t) (go n u)
-  go n (Let p v vty m o) = Let p v vty (go n m) (go (n+1) o)
+varChanger ::
+  (Int -> Pos -> Name -> Term) -> --que hacemos con las variables localmente libres
+  (Int -> Pos -> Int -> Term) -> --que hacemos con los indices de De Bruijn
+  Term ->
+  Term
+varChanger local bound t = go 0 t
+  where
+    go n (V p (Bound i)) = bound n p i
+    go n (V p (Free x)) = local n p x
+    go n (V p (Global x)) = V p (Global x)
+    go n (Lam p y ty t) = Lam p y ty (go (n + 1) t)
+    go n (App p l r) = App p (go n l) (go n r)
+    go n (Fix p f fty x xty t) = Fix p f fty x xty (go (n + 2) t)
+    go n (IfZ p c t e) = IfZ p (go n c) (go n t) (go n e)
+    go n t@(Const _ _) = t
+    go n (Print p str t) = Print p str (go n t)
+    go n (BinaryOp p op t u) = BinaryOp p op (go n t) (go n u)
+    go n (Let p v vty m o) = Let p v vty (go n m) (go (n + 1) o)
 
 -- `openN [nn,..,n0] t` reemplaza las primeras (n+1) variables ligadas
 -- en `t` (que debe ser localmente cerrado) por los nombres libres en la
 -- lista. La variable Bound 0 pasa a ser Free n0, y etc. Estos nombres
 -- deben ser frescos en el término para que no ocurra shadowing.
 openN :: [Name] -> Term -> Term
-openN ns = varChanger (\_ p n -> V p (Free n)) bnd where
-   bnd depth p i | i <  depth = V p (Bound i)
-                 | i >= depth && i < depth + nns =
-                    V p (Free (nsr !! (i - depth)))
-                 | otherwise  = abort "openN: M is not LC"
-   nns = length ns
-   nsr = reverse ns
+openN ns = varChanger (\_ p n -> V p (Free n)) bnd
+  where
+    bnd depth p i
+      | i < depth = V p (Bound i)
+      | i >= depth && i < depth + nns =
+        V p (Free (nsr !! (i - depth)))
+      | otherwise = abort "openN: M is not LC"
+    nns = length ns
+    nsr = reverse ns
 
 -- `closeN [nn,..,n0] t` es la operación inversa a open. Reemplaza
 -- las variables `Free ni` por la variable ligada `Bound i`.
 closeN :: [Name] -> Term -> Term
 closeN ns = varChanger lcl (\_ p i -> V p (Bound i))
-   where lcl depth p y =
-            case elemIndex y nsr of
-              Just i -> V p (Bound (i + depth))
-              Nothing -> V p (Free y)
-         nsr = reverse ns
+  where
+    lcl depth p y =
+      case elemIndex y nsr of
+        Just i -> V p (Bound (i + depth))
+        Nothing -> V p (Free y)
+    nsr = reverse ns
 
 -- `substN [tn,..,t0] t` sustituye los índices de de Bruijn en t con
 -- los términos de la lista. Bound 0 pasa a t0, etc. Notar el orden
@@ -73,13 +74,14 @@ closeN ns = varChanger lcl (\_ p i -> V p (Bound i))
 -- nombres frescos.
 substN :: [Term] -> Term -> Term
 substN ns = varChanger (\_ p n -> V p (Free n)) bnd
-   where bnd depth p i 
-             | i <  depth = V p (Bound i)
-             | i >= depth && i < depth + nns
-                = nsr !! (i - depth)
-             | otherwise = abort "substN: M is not LC"
-         nns = length ns
-         nsr = reverse ns
+  where
+    bnd depth p i
+      | i < depth = V p (Bound i)
+      | i >= depth && i < depth + nns =
+        nsr !! (i - depth)
+      | otherwise = abort "substN: M is not LC"
+    nns = length ns
+    nsr = reverse ns
 
 -- Algunas definiciones auxiliares:
 
@@ -91,3 +93,18 @@ close nm = closeN [nm]
 
 open :: Name -> Term -> Term
 open x t = openN [x] t
+
+global2Free :: Term -> Term
+global2Free (V info (Global name)) = V info (Free name)
+global2Free a@(V _ _) = a
+global2Free a@(Const _ _) = a
+global2Free (Lam info name ty tm) = Lam info name ty $ global2Free tm
+global2Free (App info tm1 tm2) = App info (global2Free tm1) (global2Free tm2)
+global2Free (Print info str tm) = Print info str $ global2Free tm
+global2Free (BinaryOp info op tm1 tm2) = BinaryOp info op (global2Free tm1) (global2Free tm2)
+global2Free (Fix info name1 t1 name2 ty2 tm) = Fix info name1 t1 name2 ty2 (global2Free tm)
+global2Free (IfZ info tm tt tf) = IfZ info (global2Free tm) (global2Free tt) (global2Free tf)
+global2Free (Let info name ty tm1 tm2) =
+  let tm1' = global2Free tm1
+      tm2' = global2Free tm2
+   in Let info name ty tm1' tm2'

@@ -1,5 +1,5 @@
 all: bvm
-bvm: CFLAGS+=-O3 -Wall -pedantic -lgc
-
+bvm: bvm.c
+	gcc bvm.c -o bvm -O3 -Wall -pedantic -lgc
 clean:
 	rm -f bvm
