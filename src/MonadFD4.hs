@@ -19,7 +19,7 @@ module MonadFD4
     lookupTy,
     lookupTyDef,
     printFD4,
-    printFD4noN,
+    printFD4Char,
     printFD4Debug,
     setLastFile,
     getLastFile,
@@ -127,8 +127,8 @@ catchErrors c =
             >> return Nothing
     )
 
-printFD4noN :: MonadFD4 m => String -> m ()
-printFD4noN = liftIO . putStr
+printFD4Char :: MonadFD4 m => Char -> m ()
+printFD4Char = liftIO . putChar
 
 ----
 -- Importante, no eta-expandir porque GHC no hace una

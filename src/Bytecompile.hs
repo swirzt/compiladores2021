@@ -246,7 +246,7 @@ runBC' (PRINTN : c) e st@(I n : s) = do
   printFD4 (show n)
   runBC' c e st
 runBC' (PRINTN : _) _ _ = failFD4 "Error al ejecutar PRINTN"
-runBC' (PRINT : c) e s = printStr [] c e s
+runBC' (PRINT : c) e s = printStr c e s
 runBC' (FIX : c) e (Fun ef cf : s) = let efix = Fun efix cf : e in runBC' c e (Fun efix cf : s)
 runBC' (FIX : c) _ _ = failFD4 "Error al ejecutar FIX"
 runBC' (STOP : _) _ _ = return ()
@@ -260,12 +260,9 @@ runBC' (TAILCALL : c) e (v : Fun ef cf : s) = runBC' cf (v : ef) s
 runBC' (TAILCALL : _) _ _ = failFD4 "Error al ejecutar TAILCALL"
 runBC' _ _ _ = failFD4 "Pasaron cosas"
 
-printStr :: MonadFD4 m => Bytecode -> Bytecode -> Env -> Stack -> m ()
-printStr xs (NULL : c) e s = do
-  printFD4noN str
-  runBC' c e s
-  where
-    ys = reverse xs
-    str = unicodeToString ys
-printStr xs (char : c) e s = printStr (char : xs) c e s
-printStr _ _ _ _ = failFD4 "Error al desarmar la cadena"
+printStr :: MonadFD4 m => Bytecode -> Env -> Stack -> m ()
+printStr (NULL : c) e s = runBC' c e s
+printStr (char : c) e s = do
+  printFD4Char (chr char)
+  printStr c e s
+printStr _ _ _ = failFD4 "Error al desarmar la cadena"
