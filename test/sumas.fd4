@@ -1,5 +1,8 @@
 let g : Nat -> Nat = fix (g : Nat -> Nat) (x : Nat) -> ifz x then 2 else g (x - 1 )
-let preds (n : Nat) : Nat = n - 1
+type pedro = Nat
+let k : Nat = 1
+let preds (n : pedro) : Nat = n - 1
 let sucs (n : Nat) : Nat = n + 1
 let rec sumas (m : Nat) (n : Nat) : Nat = ifz n then m else sucs (sumas m (preds n))
 let (x:Nat) = print "hola" (print "pepe " (g 10))
+let rec restas (m : Nat) (n : Nat) : Nat = ifz n then m else preds (restas m (preds n))

@@ -36,7 +36,7 @@ instance Eq Ty where
 -- | AST de Tipos con Sugar
 data STy
   = SNatTy
-  | SFunTy STy STy
+  | SFunTy {dom :: STy, codom :: STy}
   | SVarTy String
   deriving (Show)
 

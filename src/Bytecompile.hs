@@ -179,7 +179,7 @@ declToLet (DeclFun pos name ty body : xs) = do
   tm <- declToLet xs
   let bodyf = global2Free body
   return $ Let pos name ty bodyf tm
-declToLet _ = failFD4 "No soporta declaraciones de tipos"
+declToLet _ = undefined -- Para calmar al linter
 
 closeLet :: MonadFD4 m => Term -> m Term
 closeLet a@(V _ _) = return a
