@@ -4,5 +4,7 @@ let k : Nat = 1
 let preds (n : pedro) : Nat = n - 1
 let sucs (n : Nat) : Nat = n + 1
 let rec sumas (m : Nat) (n : Nat) : Nat = ifz n then m else sucs (sumas m (preds n))
-let (x:Nat) = print "hola" (print "pepe " (g 10))
+let kss : Nat = let rec f (x:Nat) : Nat = x + 1 in f 3
 let rec restas (m : Nat) (n : Nat) : Nat = ifz n then m else preds (restas m (preds n))
+let pp : Nat = let j : Nat = 3 in j
+let (x:Nat) = print "hola" (print "pepe " (sumas (restas (g 10) kss) pp))

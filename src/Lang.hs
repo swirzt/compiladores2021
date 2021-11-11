@@ -37,7 +37,7 @@ instance Eq Ty where
 data STy
   = SNatTy
   | SFunTy {dom :: STy, codom :: STy}
-  | SVarTy String
+  | SVarTy Name
   deriving (Show)
 
 type Name = String

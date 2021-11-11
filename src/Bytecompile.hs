@@ -232,7 +232,10 @@ runBC' :: MonadFD4 m => Bytecode -> Env -> Stack -> m ()
 runBC' (CONST : n : c) e s = runBC' c e (I n : s)
 runBC' (ADD : c) e (I n : I m : s) = runBC' c e (I (m + n) : s)
 runBC' (ADD : _) _ _ = failFD4 "Error al ejecutar ADD"
-runBC' (SUB : c) e (I n : I m : s) = runBC' c e (I (m - n) : s)
+runBC' (SUB : c) e (I n : I m : s) =
+  if m > n
+    then runBC' c e (I (m - n) : s)
+    else runBC' c e (I 0 : s)
 runBC' (SUB : _) _ _ = failFD4 "Error al ejecutar SUB"
 runBC' (ACCESS : i : c) e s = runBC' c e (e !! i : s)
 runBC' (CALL : c) e (v : Fun ef cf : s) = runBC' cf (v : ef) (RA e c : s)

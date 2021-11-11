@@ -309,7 +309,7 @@ printPhrase x =
     t  <- case x' of
            (SV p f) -> maybe ex id <$> lookupDecl f
            _       -> return ex
-    printFD4 "NTerm:"
+    printFD4 "STerm:"
     printFD4 (show x')
     printFD4 "\nTerm:"
     printFD4 (show t)

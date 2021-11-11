@@ -73,7 +73,11 @@ opColor = annotate (colorDull Green)
 
 keywordColor = annotate (colorDull Green) -- <> bold)
 
+stringColor = annotate (colorDull Yellow)
+
 typeColor = annotate (color Blue <> italicized)
+
+nameTypeColor = annotate (color Cyan)
 
 typeOpColor = annotate (colorDull Blue)
 
@@ -84,6 +88,12 @@ nameColor = id
 -- | Pretty printer de nombres (Doc)
 name2doc :: Name -> Doc AnsiStyle
 name2doc n = nameColor (pretty n)
+
+nameT2doc :: Name -> Doc AnsiStyle
+nameT2doc n = nameTypeColor (pretty n)
+
+string2doc :: Name -> Doc AnsiStyle
+string2doc s = stringColor $ pretty (show s)
 
 -- |  Pretty printer de nombres (String)
 ppName :: Name -> String
@@ -100,7 +110,7 @@ sty2doc :: STy -> Doc AnsiStyle
 sty2doc SNatTy = typeColor (pretty "Nat")
 sty2doc (SFunTy x@(SFunTy _ _) y) = sep [parens (sty2doc x), typeOpColor (pretty "->"), sty2doc y]
 sty2doc (SFunTy x y) = sep [sty2doc x, typeOpColor (pretty "->"), sty2doc y]
-sty2doc (SVarTy n) = name2doc n
+sty2doc (SVarTy n) = nameT2doc n
 
 -- | Pretty printer para tipos (String)
 ppTy :: Ty -> String
@@ -242,25 +252,41 @@ st2doc at (SIfZ _ c t e) =
       ]
 st2doc at (SPrint _ str t) =
   parenIf at $
-    sep [keywordColor (pretty "print"), pretty (show str), st2doc True t]
+    sep [keywordColor (pretty "print"), string2doc str, st2doc True t]
 st2doc at (SPrintEta _ str) =
   parenIf at $
-    sep [keywordColor (pretty "print"), pretty (show str)]
+    sep [keywordColor (pretty "print"), string2doc str]
 st2doc at (SLet _ v xs ty t t' b) =
-  parenIf at $
-    sep
-      [ sep
-          [ keywordColor (pretty $ recIf b),
-            name2doc v,
-            sbinding2doc xs,
-            pretty ":",
-            sty2doc ty,
-            opColor (pretty "=")
-          ],
-        nest 2 (st2doc False t),
-        keywordColor (pretty "in"),
-        nest 2 (st2doc False t')
-      ]
+  case xs of
+    [] ->
+      parenIf at $
+        sep
+          [ sep
+              [ keywordColor (pretty $ recIf b),
+                name2doc v,
+                pretty ":",
+                sty2doc ty,
+                opColor (pretty "=")
+              ],
+            nest 2 (st2doc False t),
+            keywordColor (pretty "in"),
+            nest 2 (st2doc False t')
+          ]
+    _ ->
+      parenIf at $
+        sep
+          [ sep
+              [ keywordColor (pretty $ recIf b),
+                name2doc v,
+                sbinding2doc xs,
+                pretty ":",
+                sty2doc ty,
+                opColor (pretty "=")
+              ],
+            nest 2 (st2doc False t),
+            keywordColor (pretty "in"),
+            nest 2 (st2doc False t')
+          ]
 st2doc at (SBinaryOp _ o a b) =
   parenIf at $
     st2doc True a <+> binary2doc o <+> st2doc True b
@@ -329,18 +355,32 @@ sppDecl (DeclFun info x ty t) = do
   sdecl <- resugarDecl $ DeclFun info x ty st
   case sdecl of
     (SDeclFun _ name vars tyDecl def bool) ->
-      return
-        ( render $
-            sep
-              [ defColor (pretty $ recIf bool),
-                name2doc name,
-                sbinding2doc vars,
-                defColor (pretty ":"),
-                sty2doc tyDecl,
-                defColor (pretty "=")
-              ]
-              <+> nest 2 (st2doc False def)
-        )
+      case vars of
+        [] ->
+          return
+            ( render $
+                sep
+                  [ defColor (pretty $ recIf bool),
+                    name2doc name,
+                    defColor (pretty ":"),
+                    sty2doc tyDecl,
+                    defColor (pretty "=")
+                  ]
+                  <+> nest 2 (st2doc False def)
+            )
+        _ ->
+          return
+            ( render $
+                sep
+                  [ defColor (pretty $ recIf bool),
+                    name2doc name,
+                    sbinding2doc vars,
+                    defColor (pretty ":"),
+                    sty2doc tyDecl,
+                    defColor (pretty "=")
+                  ]
+                  <+> nest 2 (st2doc False def)
+            )
     _ -> failFD4 "Cannot pattern match declaration"
 sppDecl (DeclType _ n t) =
   do
@@ -349,7 +389,7 @@ sppDecl (DeclType _ n t) =
       ( render $
           sep
             [ defColor (pretty "type"),
-              name2doc n,
+              nameT2doc n,
               defColor (pretty "="),
               sty2doc sty
             ]
