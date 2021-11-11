@@ -4,13 +4,27 @@
 #include <stdlib.h>
 #include <inttypes.h>
 #include <gc.h>
+#include <wchar.h>
 
-uint32_t pcf_print(uint32_t x) {
-	printf("%" PRIu32 "\n", x);
-	return x;
+/*
+  Runtime para el compilador a C.
+  Compilar los programas generados con:
+	gcc runtime.c -lgc programa.c
+*/
+
+
+void *fd4_printn(uint64_t x) {
+	wprintf(L"%" PRIu64 "\n", x);
+	return (void *)x;
 }
 
-void *pcf_mkclosure(void *fun, int amt, ...)
+void*fd4_sub(uint64_t x, uint64_t y) {
+	if (x >y) {
+		return (void *)(x-y);
+	} else return 0;	
+}
+
+void *fd4_mkclosure(void *fun, int amt, ...)
 {
 	int i;
 	va_list valist;
@@ -29,17 +43,16 @@ void *pcf_mkclosure(void *fun, int amt, ...)
 		uint64_t *a = va_arg(valist, uint64_t*);
 		res[i] = a;
 	}
-
 	va_end(valist);
 
 	return res;
 }
 
-extern uint64_t* pcfmain(void);
+extern uint64_t* fd4main(void);
 
 int main (int argc, char **argv) {
 	GC_INIT();
-	uint64_t* rp = pcfmain();
+	uint64_t* rp = fd4main();
 	uint64_t r = (uint64_t)rp;
 	return r;
 }
