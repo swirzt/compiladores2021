@@ -8,7 +8,7 @@
 --
 -- Este módulo permite elaborar términos y declaraciones para convertirlas desde
 -- fully named (@NTerm) a locally closed (@Term@)
-module Elab (elab, desugarDecl, desugarTy) where
+module Elab (elab, desugarDecl, desugarTy, resugarTy, resugar, resugarDecl) where
 
 import Lang
 import MonadFD4
@@ -71,7 +71,7 @@ desugar (SLet info f ((n, sty) : xs) lty stmt stmt' True) = desugar $ SLet info 
 desugar (SLet info f xs lty stmt stmt' False) = do
   stmtDesugar' <- desugar stmt'
   lamDesugar <- desugar $ SLam info xs stmt
-  ty <- deconcatTy xs lty
+  ty <- desugarConcatTy xs lty
   return $ Let info f ty lamDesugar stmtDesugar'
 
 desugarTy :: MonadFD4 m => STy -> m Ty
@@ -90,8 +90,8 @@ concatTy :: [(a, STy)] -> STy -> STy
 concatTy [] a = a
 concatTy ((name, sty) : xs) a = SFunTy sty (concatTy xs a)
 
-deconcatTy :: MonadFD4 m => [(a, STy)] -> STy -> m Ty
-deconcatTy xs a = desugarTy $ concatTy xs a
+desugarConcatTy :: MonadFD4 m => [(a, STy)] -> STy -> m Ty
+desugarConcatTy xs a = desugarTy $ concatTy xs a
 
 -- desugar ( Si la primer lista de Let es vacio es sin sugar
 -- desugar (SType info Name STy
@@ -127,11 +127,77 @@ elab' env (Let p v vty def body) = Let p v vty (elab' env def) (close v (elab' (
 
 desugarDecl :: MonadFD4 m => SDecl STerm -> m (Decl STerm)
 desugarDecl (SDeclFun pos name vars ty def False) = do
-  tyDesugar <- deconcatTy vars ty
+  tyDesugar <- desugarConcatTy vars ty
   case vars of
     [] -> return $ DeclFun pos name tyDesugar def
     _ -> return $ DeclFun pos name tyDesugar (SLam pos vars def)
 desugarDecl (SDeclFun pos name vars ty def True) = do
-  tyDesugar <- deconcatTy vars ty
+  tyDesugar <- desugarConcatTy vars ty
   return $ DeclFun pos name tyDesugar (SFix pos name (concatTy vars ty) vars def)
 desugarDecl _ = failFD4 "Si llegué acá algo esta mal jej"
+
+resugarDecl :: MonadFD4 m => Decl STerm -> m (SDecl STerm)
+resugarDecl (DeclFun pos name ty def) = do
+  sty <- resugarTy ty
+  case def of
+    SLam _ vars tt -> return $ SDeclFun pos name vars ((iterate codom sty) !! (length vars)) tt False
+    SFix _ fname fty vars tt -> return $ SDeclFun pos fname vars ((iterate codom sty) !! (length vars)) tt True
+    _ -> return $ SDeclFun pos name [] sty def False
+resugarDecl _ = failFD4 "Si llegué acá algo esta mal jej"
+
+resugar :: MonadFD4 m => NTerm -> m STerm
+resugar (V info var) = return $ SV info var
+resugar (Const info c) = return $ SConst info c
+resugar (Lam info fv tv tm) = do
+  stm <- resugar tm
+  tvs <- resugarTy tv
+  case stm of
+    SLam _ xs tms -> return $ SLam info ((fv, tvs) : xs) tms
+    SPrint _ str (SV _ fvp) ->
+      if fv == fvp
+        then return $ SPrintEta info str
+        else return $ SLam info [(fv, tvs)] stm
+    _ -> return $ SLam info [(fv, tvs)] stm
+resugar (App info tm1 tm2) = do
+  stm1 <- resugar tm1
+  stm2 <- resugar tm2
+  return $ SApp info stm1 stm2
+resugar (Print info str tm) = resugar tm >>= \stm -> return $ SPrint info str stm
+resugar (BinaryOp info bo tm1 tm2) = do
+  stm1 <- resugar tm1
+  stm2 <- resugar tm2
+  return $ SBinaryOp info bo stm1 stm2
+resugar (Fix info nf tf nv tv tm) = do
+  stm <- resugar tm
+  tfs <- resugarTy tf
+  tvs <- resugarTy tv
+  case stm of
+    SLam _ xs tms -> return $ SFix info nf tfs ((nv, tvs) : xs) tms
+    _ -> return $ SFix info nf tfs [(nv, tvs)] stm
+resugar (Let info nv tv tt tm) = do
+  stt <- resugar tt
+  stm <- resugar tm
+  stv <- resugarTy tv
+  case stt of -- Gano Gurvich
+    SFix _ nf stf xs tms ->
+      -- Hay que hacer algo con el concat de tipos en el letrec
+      if nv == nf
+        then return $ SLet info nf xs (codom stf) tms stm True
+        else return $ SLet info nv [] stv stt stm False
+    SLam _ xs tm2 -> do
+      let typeF = (iterate codom stv) !! (length xs) --Para obtener el codominio n veces
+      return $ SLet info nv xs typeF tm2 stm False
+    _ -> return $ SLet info nv [] stv stt stm False
+resugar (IfZ info tmb tmt tmf) = do
+  stmb' <- resugar tmb
+  stmt' <- resugar tmt
+  stmf' <- resugar tmf
+  return $ SIfZ info stmb' stmt' stmf'
+
+resugarTy :: MonadFD4 m => Ty -> m STy
+resugarTy NatTy = return SNatTy
+resugarTy (FunTy x y) = do
+  xx <- resugarTy x
+  yy <- resugarTy y
+  return (SFunTy xx yy)
+resugarTy (NameTy n ty) = return $ SVarTy n

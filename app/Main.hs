@@ -33,7 +33,7 @@ import Lang
 import Parse ( P, tm, program, declOrTm, runP )
 import Elab ( elab, desugarDecl, desugarTy )
 import Eval ( eval )
-import PPrint ( pp , ppTy, ppDecl )
+import PPrint
 import MonadFD4
 import TypeChecker ( tc, tcDecl )
 import CEK
@@ -70,9 +70,9 @@ parseMode = (,) <$>
   -- <|> flag' LLVM ( long "llvm" <> short 'l' <> help "Imprimir LLVM resultante")
   -- <|> flag' Build ( long "build" <> short 'b' <> help "Compilar")
       )
-   <*> pure False
+  --  <*> pure False
    -- reemplazar por la siguiente línea para habilitar opción
-   -- <*> flag False True (long "optimize" <> short 'o' <> help "Optimizar código")
+    <*> flag False True (long "optimize" <> short 'o' <> help "Optimizar código")
 
 -- | Parser de opciones general, consiste de un modo y una lista de archivos a procesar
 parseArgs :: Parser (Mode,Bool, [FilePath])
@@ -168,7 +168,7 @@ typecheckFile ::  MonadFD4 m => Bool -> FilePath -> m ()
 typecheckFile opt f = do
     printFD4  ("Chequeando "++f)
     decls <- loadFile f
-    ppterms <- mapM (typecheckDecl >=> ppDecl) decls
+    ppterms <- mapM (typecheckDecl >=> sppDecl) decls
     mapM_ printFD4 ppterms
 
 parseIO ::  MonadFD4 m => String -> P a -> String -> m a
@@ -309,7 +309,7 @@ printPhrase x =
     t  <- case x' of
            (SV p f) -> maybe ex id <$> lookupDecl f
            _       -> return ex
-    printFD4 "NTerm:"
+    printFD4 "STerm:"
     printFD4 (show x')
     printFD4 "\nTerm:"
     printFD4 (show t)
@@ -322,11 +322,16 @@ typeCheckPhrase x = do
          ty <- tc tt (tyEnv s)
          printFD4 (ppTy ty)
 
+-- Filtra las declaraciones de tipos
+filterSTypes :: MonadFD4 m => Decl Term -> m Bool
+filterSTypes DeclFun {} = return True
+filterSTypes DeclType {} = return False
 
 bytecompileFile :: MonadFD4 m => FilePath -> m ()
 bytecompileFile fp = do xs <- loadFile fp
                         ys <- mapM typecheckDecl xs
-                        byte <- bytecompileModule ys
+                        ys' <- filterM filterSTypes ys
+                        byte <- bytecompileModule ys'
                         liftIO $ bcWrite byte (replaceExtension fp ".o")
                         return ()
 

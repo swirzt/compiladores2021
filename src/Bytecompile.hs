@@ -179,7 +179,7 @@ declToLet (DeclFun pos name ty body : xs) = do
   tm <- declToLet xs
   let bodyf = global2Free body
   return $ Let pos name ty bodyf tm
-declToLet _ = failFD4 "No soporta declaraciones de tipos"
+declToLet _ = undefined -- Para calmar al linter
 
 closeLet :: MonadFD4 m => Term -> m Term
 closeLet a@(V _ _) = return a
@@ -232,7 +232,10 @@ runBC' :: MonadFD4 m => Bytecode -> Env -> Stack -> m ()
 runBC' (CONST : n : c) e s = runBC' c e (I n : s)
 runBC' (ADD : c) e (I n : I m : s) = runBC' c e (I (m + n) : s)
 runBC' (ADD : _) _ _ = failFD4 "Error al ejecutar ADD"
-runBC' (SUB : c) e (I n : I m : s) = runBC' c e (I (m - n) : s)
+runBC' (SUB : c) e (I n : I m : s) =
+  if m > n
+    then runBC' c e (I (m - n) : s)
+    else runBC' c e (I 0 : s)
 runBC' (SUB : _) _ _ = failFD4 "Error al ejecutar SUB"
 runBC' (ACCESS : i : c) e s = runBC' c e (e !! i : s)
 runBC' (CALL : c) e (v : Fun ef cf : s) = runBC' cf (v : ef) (RA e c : s)
