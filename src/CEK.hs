@@ -55,7 +55,7 @@ destroy n@(Num m) (FPrint s : xs) = do
 destroy (Num n) (FOpL e op tm : xs) = search tm e (FOpR n op : xs)
 destroy (Num m) (FOpR x op : xs) = case op of
   Add -> destroy (Num $ x + m) xs
-  Sub -> destroy (Num $ x - m) xs
+  Sub -> destroy (Num $ max 0 (x - m)) xs
 destroy (Num 0) (FIfz e t1 t2 : xs) = search t1 e xs
 destroy (Num _) (FIfz e t1 t2 : xs) = search t2 e xs
 destroy (Clos clos) (FAppL e tm : xs) = search tm e (FAppR clos : xs)
