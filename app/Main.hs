@@ -39,6 +39,8 @@ import TypeChecker ( tc, tcDecl )
 import CEK
 import Bytecompile (bytecompileModule, bcWrite, bcRead, runBC)
 import System.FilePath.Windows (replaceExtension)
+import LLVM.AST.Type (fp128)
+import ClosureConvert
 
 prompt :: String
 prompt = "FD4> "
@@ -52,7 +54,7 @@ data Mode =
   | InteractiveCEK
   | Bytecompile 
   | RunVM
-  -- | CC
+  | CC
   -- | Canon
   -- | LLVM
   -- | Build
@@ -65,7 +67,7 @@ parseMode = (,) <$>
       <|> flag' Bytecompile (long "bytecompile" <> short 'm' <> help "Compilar a la BVM")
       <|> flag' RunVM (long "runVM" <> short 'r' <> help "Ejecutar bytecode en la BVM")
       <|> flag Interactive Interactive ( long "interactive" <> short 'i' <> help "Ejecutar en forma interactiva")
-  -- <|> flag' CC ( long "cc" <> short 'c' <> help "Compilar a código C")
+      <|> flag' CC ( long "cc" <> short 'c' <> help "Compilar a código C")
   -- <|> flag' Canon ( long "canon" <> short 'n' <> help "Imprimir canonicalización")
   -- <|> flag' LLVM ( long "llvm" <> short 'l' <> help "Imprimir LLVM resultante")
   -- <|> flag' Build ( long "build" <> short 'b' <> help "Compilar")
@@ -99,8 +101,8 @@ main = execParser opts >>= go
               runOrFail $ mapM_ bytecompileFile files
     go (RunVM,_,files) =
               runOrFail $ mapM_ bytecodeRun files
-    -- go (CC,_, files) =
-    --           runOrFail $ mapM_ ccFile files
+    go (CC,_, files) =
+              runOrFail $ mapM_ ccFile files
     -- go (Canon,_, files) =
     --           runOrFail $ mapM_ canonFile files 
     -- go (LLVM,_, files) =
@@ -339,3 +341,12 @@ bytecompileFile fp = do xs <- loadFile fp
 bytecodeRun :: MonadFD4 m => FilePath -> m()
 bytecodeRun fp = do file <- liftIO $ bcRead fp
                     runBC file
+
+ccFile :: MonadFD4 m => FilePath -> m()
+ccFile fp = do xs <- loadFile fp
+               ys <- mapM typecheckDecl xs
+              --  printFD4Debug ys
+               let imp = compilaC ys
+               liftIO $ cWrite imp (replaceExtension fp ".c")
+              --  printFD4Debug imp
+               return ()

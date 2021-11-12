@@ -2,6 +2,7 @@ module ClosureConvert where
 
 import C
 import Control.Monad.Writer
+import qualified Data.ByteString.Lazy as BS
 import GHC.IO.Encoding (BufferCodec (close))
 import IR
 import Lang
@@ -46,17 +47,29 @@ closureConvert (IfZ _ tb tt tf) = do
   tf' <- closureConvert tf
   return $ IrIfZ tb' tt' tf'
 closureConvert (Fix _ fn _ vn _ tm) = do
-  itm <- closureConvert tm
-  fname <- generateName "g"
   let fvars = freeVars tm
+  let ttm = openN [vn, fn] tm
+  itm <- closureConvert ttm
+  fname <- generateName "f"
   tell [IrFun fname fvars itm]
-  return $ MkClosure fname (fmap IrVar fvars)
+  return $ MkClosure fname (fmap IrVar $ fn : vn : fvars)
 closureConvert (Let _ name _ tn tm) = do
+  let ttm = open name tm
   itn <- closureConvert tn
-  itm <- closureConvert tm
+  itm <- closureConvert ttm
   return $ IrLet name itn itm
 
 runCC :: [Decl Term] -> [IrDecl]
-runCC t = snd $ runWriter $ runStateT (mapM_ (\d -> fmap closureConvert d) t) 0
-  where
-    cvt2Closure = do closureConvert d
+runCC [] = []
+runCC (decl : xs) = case decl of
+  DeclType _ _ _ -> runCC xs
+  DeclFun _ name ty tt ->
+    let ((x, _), xx) = runWriter $ runStateT (closureConvert tt) 0
+        y = runCC xs
+     in xx ++ y
+
+compilaC :: [Decl Term] -> String
+compilaC xs = ir2C $ IrDecls $ runCC xs
+
+cWrite :: String -> FilePath -> IO ()
+cWrite cp filename = writeFile filename cp

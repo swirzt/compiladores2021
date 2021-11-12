@@ -11,4 +11,4 @@ stack.yaml.lock
 *.blg
 *.bbl
 compiladores.cabal
-
+test/*.c
