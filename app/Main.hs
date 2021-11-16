@@ -39,7 +39,7 @@ import TypeChecker ( tc, tcDecl )
 import CEK
 import Bytecompile (bytecompileModule, bcWrite, bcRead, runBC)
 import System.FilePath.Windows (replaceExtension)
-import LLVM.AST.Type (fp128)
+-- import LLVM.AST.Type (fp128)
 import ClosureConvert
 
 prompt :: String
@@ -183,7 +183,7 @@ typecheckDecl a@(SDeclFun pos _ _ _ _ _) = do
         output <- desugarDecl a
         case output of
           DeclFun i n ty t -> do elabTerm <- elab t
-                                 let dd = (DeclFun i n ty elabTerm)
+                                 let dd = DeclFun i n ty elabTerm
                                  tcDecl dd
                                  return dd
           _ -> failPosFD4 pos "Error interpretando una declaracion"
@@ -280,25 +280,16 @@ compilePhrase x mode = do dot <- parseIO "<interactive>" declOrTm x
                           case dot of
                            Left d  -> handleDecl d 
                            Right t -> case mode of
-                                        Interactive -> handleTerm t
-                                        InteractiveCEK -> handleTermCEK t
+                                        Interactive -> handleTerm t eval
+                                        InteractiveCEK -> handleTerm t evalCEK
                                         _ -> undefined -- para que no me moleste el linter
 
-handleTerm ::  MonadFD4 m => STerm -> m ()
-handleTerm t = do
+handleTerm ::  MonadFD4 m => STerm -> (Term -> m Term) -> m ()
+handleTerm t f = do
          elabTerm <- elab t
          s <- get
          ty <- tc elabTerm (tyEnv s)
-         te <- eval elabTerm
-         ppte <- pp te
-         printFD4 (ppte ++ " : " ++ ppTy ty)
-
-handleTermCEK :: MonadFD4 m => STerm -> m ()
-handleTermCEK t = do
-         elabTerm <- elab t
-         s <- get
-         ty <- tc elabTerm (tyEnv s)
-         te <- evalCEK elabTerm
+         te <- f elabTerm
          ppte <- pp te
          printFD4 (ppte ++ " : " ++ ppTy ty)
          
@@ -347,6 +338,8 @@ ccFile fp = do xs <- loadFile fp
                ys <- mapM typecheckDecl xs
               --  printFD4Debug ys
                let imp = compilaC ys
+              --  let r = runCC 0 ys
+              --  printFD4Debug r
                liftIO $ cWrite imp (replaceExtension fp ".c")
               --  printFD4Debug imp
                return ()

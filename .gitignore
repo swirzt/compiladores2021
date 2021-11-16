@@ -12,3 +12,6 @@ stack.yaml.lock
 *.bbl
 compiladores.cabal
 test/*.c
+a.out
+.vscode/settings.json
+pepe
