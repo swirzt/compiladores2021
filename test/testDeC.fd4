@@ -3,4 +3,4 @@ let f (xl:Nat) : Nat = x + 5 + xl
 let rec g (m : Nat) : Nat = ifz m then 10 else g (m - 1)
 let rec sumas (m : Nat) (n:Nat) : Nat = ifz m then n else sumas (m-1) (n+1)
 let k : Nat = let p : Nat = 1 in p + 1 
-let y : Nat = sumas 10 70
+let y : Nat = sumas (sumas (sumas 100 0) x) (f k)
