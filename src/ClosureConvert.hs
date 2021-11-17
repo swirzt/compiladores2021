@@ -17,12 +17,9 @@ generateName n = do
   return $ n ++ show k
 
 makeLet :: Ir -> Name -> [Name] -> Bool -> Ir
-makeLet tm name xs False = makeLet' tm name xs 1
+makeLet tm name xs False = foldr (\(x, y) r -> IrLet x (IrAccess (IrVar name) y) r) tm (zip xs [1 ..])
 makeLet tm _ [] True = tm
-makeLet tm name (x : xs) True = IrLet x (IrVar name) (makeLet' tm name xs 2)
-
-makeLet' :: Ir -> Name -> [Name] -> Int -> Ir
-makeLet' tm name xs n = foldr (\(x, y) r -> IrLet x (IrAccess (IrVar name) y) r) tm (zip xs [n ..])
+makeLet tm name (x : xs) True = IrLet x (IrVar name) (makeLet tm name xs False)
 
 closureConvert :: Term -> StateT (Int, [Name]) (Writer [IrDecl]) Ir
 closureConvert (V _ var) = case var of
@@ -71,7 +68,7 @@ closureConvert (Fix i fn fty vn ty tm) = do
   let cname = "closure" ++ fname
   let itm' = makeLet itm cname (frname : fvars) True
   tell [IrFun fname [cname, vname] itm']
-  return $ MkClosure fname (fmap IrVar $ fname : fvars)
+  return $ MkClosure fname (fmap IrVar fvars)
 closureConvert (Let _ name _ tn tm) = do
   vname <- generateName name
   let ttm = open vname tm

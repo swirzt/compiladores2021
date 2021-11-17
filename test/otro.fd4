@@ -1,0 +1,15 @@
+type Bool = Nat
+let true : Bool = 1
+let false : Bool = 0
+
+let ifthenelse (x : Bool) (t : Nat) (f : Nat) : Nat = ifz x then f else t
+
+type Pair = Bool -> Nat
+
+let pair (x : Nat) (y : Nat) : Pair = fun (f : Bool) -> ifthenelse f x y
+
+let proj1 (p : Pair) : Nat = p true
+
+let proj2 (p : Pair) : Nat = p false
+
+let y : Nat = let k : Pair = pair 21 22 in proj1 k + proj2 k

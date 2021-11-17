@@ -48,3 +48,5 @@ let suma2s (x : Nat) (y : Nat) : Nat = R y (fun (w:Nat) -> fun (z:Nat) -> suc w)
 
 let min : (Nat -> Nat) -> Nat = fun (f:Nat -> Nat) -> (fix(min : Nat -> Nat) (n:Nat) -> ifz (f n) then n else min (suc n)) 0
 let mins (f : Nat -> Nat) : Nat = (fix(min : Nat -> Nat) (n:Nat) -> ifz (f n) then n else min (suc n)) 0
+
+let y : Nat = mins sucs
