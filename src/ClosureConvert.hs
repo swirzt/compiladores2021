@@ -66,13 +66,10 @@ closureConvert (Fix i fn fty vn ty tm) = do
   fname <- generateName fn
   frname <- generateName "fr"
   let ttm = openN [frname, vname] tm
-  traceM $ "Termino\n" ++ show ttm
   modify (\(k, vars) -> (k, vname : frname : vars))
   itm <- closureConvert ttm
   let cname = "closure" ++ fname
   let itm' = makeLet itm cname (frname : fvars) True
-  traceM $ "itm:\n" ++ show itm
-  traceM $ "itm':\n" ++ show itm'
   tell [IrFun fname [cname, vname] itm']
   return $ MkClosure fname (fmap IrVar $ fname : fvars)
 closureConvert (Let _ name _ tn tm) = do
