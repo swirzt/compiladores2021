@@ -33,11 +33,19 @@ En general, los argumentos a nuestro programa se escriben luego de `--`. Por eje
 % stack run -- --help
 Compilador de FD4 de la materia Compiladores 2021
 
-Usage: compiladores-exe [(-t|--typecheck) | (-i|--interactive)] [FILES...]
+Usage: compiladores-exe [(-t|--typecheck) | (-k|--interactiveCEK) |
+                          (-m|--bytecompile) | (-r|--runVM) |
+                          (-i|--interactive) | (-c|--cc)] [-o|--optimize]
+                        [FILES...]
   Compilador de FD4
 
 Available options:
-  -t,--typecheck           Solo chequear tipos
+  -t,--typecheck           Chequear tipos e imprimir el término
+  -k,--interactiveCEK      Ejecutar interactivamente en la CEK
+  -m,--bytecompile         Compilar a la BVM
+  -r,--runVM               Ejecutar bytecode en la BVM
   -i,--interactive         Ejecutar en forma interactiva
+  -c,--cc                  Compilar a código C
+  -o,--optimize            Optimizar código
   -h,--help                Show this help text
 ```
