@@ -12,15 +12,14 @@
 	gcc runtime.c -lgc programa.c
 */
 
-
-void *fd4_printn(uint64_t x) {
+uint64_t fd4_printn(uint64_t x) {
 	wprintf(L"%" PRIu64 "\n", x);
-	return (void *)x;
+	return x;
 }
 
-void*fd4_sub(uint64_t x, uint64_t y) {
+uint64_t fd4_sub(uint64_t x, uint64_t y) {
 	if (x >y) {
-		return (void *)(x-y);
+		return x-y;
 	} else return 0;	
 }
 
@@ -48,11 +47,10 @@ void *fd4_mkclosure(void *fun, int amt, ...)
 	return res;
 }
 
-extern uint64_t* fd4main(void);
+extern uint64_t fd4main(void);
 
 int main (int argc, char **argv) {
 	GC_INIT();
-	uint64_t* rp = fd4main();
-	uint64_t r = (uint64_t)rp;
-	return r;
+	uint64_t rp = fd4main();
+	return rp;
 }

@@ -100,3 +100,36 @@ g2f x = x
 
 global2Free :: Term -> Term
 global2Free = fmap g2f
+------Compilar a C
+varChangerTTerm ::
+  (Int -> Ty -> Name -> TTerm) -> --que hacemos con las variables localmente libres
+  (Int -> Ty -> Int -> TTerm) -> --que hacemos con los indices de De Bruijn
+  TTerm ->
+  TTerm
+varChangerTTerm local bound t = go 0 t
+  where
+    go n (TV (Bound i) t) = bound n t i
+    go n (TV (Free x) t) = local n t x
+    go n tm@(TV (Global x) t) = tm
+    go n (TLam y ty t ty') = TLam y ty (go (n + 1) t) ty'
+    go n (TApp l r t1 t2) = TApp (go n l) (go n r) t1 t2
+    go n (TFix f fty x xty t ty) = TFix f fty x xty (go (n + 2) t) ty
+    go n (TIfZ c t e ty) = TIfZ (go n c) (go n t) (go n e) ty
+    go n t@(TConst _ _) = t
+    go n (TPrint str t ty) = TPrint str (go n t) ty
+    go n (TBinaryOp op t u ty) = TBinaryOp op (go n t) (go n u) ty
+    go n (TLet v vty m o ty) = TLet  v vty (go n m) (go (n + 1) o) ty
+
+openNTTerm :: [Name] -> TTerm -> TTerm
+openNTTerm ns = varChangerTTerm (\_ ty n -> TV (Free n) ty) bnd
+  where
+    bnd depth ty i
+      | i < depth = TV (Bound i) ty
+      | i >= depth && i < depth + nns =
+        TV (Free (nsr !! (i - depth))) ty
+      | otherwise = abort "openN: M is not LC"
+    nns = length ns
+    nsr = reverse ns
+
+openTTerm :: Name -> TTerm -> TTerm
+openTTerm x t = openNTTerm [x] t

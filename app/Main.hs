@@ -14,9 +14,6 @@ module Main where
 
 import System.Console.Haskeline ( defaultSettings, getInputLine, runInputT, InputT )
 import Control.Monad.Catch (MonadMask)
-
---import Control.Monad
--- import Control.Monad.Trans ( MonadIO(liftIO), MonadTrans(lift) )
 import Data.List (nub,  intersperse, isPrefixOf )
 import Data.Char ( isSpace )
 import Control.Exception ( catch , IOException )
@@ -35,11 +32,10 @@ import Elab ( elab, desugarDecl, desugarTy )
 import Eval ( eval )
 import PPrint
 import MonadFD4
-import TypeChecker ( tc, tcDecl )
+import TypeChecker ( tc, tcDecl, tcDeclTy )
 import CEK
 import Bytecompile (bytecompileModule, bcWrite, bcRead, runBC)
 import System.FilePath.Windows (replaceExtension)
--- import LLVM.AST.Type (fp128)
 import ClosureConvert
 
 prompt :: String
@@ -333,13 +329,24 @@ bytecodeRun :: MonadFD4 m => FilePath -> m()
 bytecodeRun fp = do file <- liftIO $ bcRead fp
                     runBC file
 
+-- Para compilar en C
+typecheckDeclTy :: MonadFD4 m => SDecl STerm -> m (Decl TTerm)
+typecheckDeclTy a@(SDeclFun pos _ _ _ _ _) = do
+        output <- desugarDecl a
+        case output of
+          DeclFun i n ty t -> do elabTerm <- elab t
+                                 let dd = DeclFun i n ty elabTerm
+                                 dd' <- tcDeclTy dd
+                                 return dd'
+          _ -> failPosFD4 pos "Error interpretando una declaracion"
+typecheckDeclTy (SDeclType i n v) = do tyDesugar <- desugarTy v
+                                       let dd = DeclType i n tyDesugar
+                                       tcDecl dd
+                                       return dd
+
 ccFile :: MonadFD4 m => FilePath -> m()
 ccFile fp = do xs <- loadFile fp
-               ys <- mapM typecheckDecl xs
-              --  printFD4Debug ys
+               ys <- mapM typecheckDeclTy xs
                let imp = compilaC ys
-              --  let r = runCC 0 ys
-              --  printFD4Debug r
                liftIO $ cWrite imp (replaceExtension fp ".c")
-              --  printFD4Debug imp
                return ()

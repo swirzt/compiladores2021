@@ -21,9 +21,9 @@ import Data.List.Extra (nubSort)
 -- | AST de Tipos
 data Ty
   = NatTy
-  | FunTy Ty Ty
+  | FunTy {tdom :: Ty, tcodom :: Ty} -- Mal planeamiento a futuro
   | NameTy Name Ty
-  deriving (Show)
+  deriving (Show, Ord)
 
 instance Eq Ty where
   NatTy == NatTy = True
@@ -113,6 +113,21 @@ type Term =
   -- | 'Tm' con índices de De Bruijn como variables ligadas, y nombres para libres y globales, guarda posición`
   Tm Pos Var
 
+data TTm var
+  = TV var Ty
+  | TConst Const Ty
+  | TLam Name Ty (TTm var) Ty
+  | TApp (TTm var) (TTm var) Ty Ty
+  | TPrint String (TTm var) Ty
+  | TBinaryOp BinaryOp (TTm var) (TTm var) Ty
+  | TFix Name Ty Name Ty (TTm var) Ty
+  | TIfZ (TTm var) (TTm var) (TTm var) Ty
+  | TLet Name Ty (TTm var) (TTm var) Ty
+  deriving (Show, Functor)
+
+type TTerm =
+  TTm Var
+
 data Var
   = Bound !Int
   | Free Name
@@ -146,3 +161,18 @@ freeVars tm = nubSort $ go tm []
     go (IfZ _ c t e) xs = go c $ go t $ go e xs
     go (Const _ _) xs = xs
     go (Let _ _ _ e t) xs = go e (go t xs)
+
+freeVarsTTerm :: TTerm -> [(Name,Ty)]
+freeVarsTTerm tm = nubSort $ go tm [] 
+  where
+    go (TV (Free v) ty) xs = (v,ty) : xs
+    go (TV (Global v) ty) xs = (v,ty) : xs
+    go (TV _ _) xs = xs
+    go (TLam _ _ t _) xs = go t xs
+    go (TApp l r _ _) xs = go l $ go r xs
+    go (TPrint _ t _) xs = go t xs
+    go (TBinaryOp _ t u _) xs = go t $ go u xs
+    go (TFix _ _ _ _ t _) xs = go t xs
+    go (TIfZ c t e _) xs = go c $ go t $ go e xs
+    go (TConst _ _) xs = xs
+    go (TLet _ _ e t _) xs = go e (go t xs)
