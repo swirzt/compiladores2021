@@ -138,7 +138,9 @@ resugarDecl (DeclFun pos name ty def) = do
   sty <- resugarTy ty
   case def of
     SLam _ vars tt -> return $ SDeclFun pos name vars ((iterate codom sty) !! (length vars)) tt False
-    SFix _ fname fty vars tt -> return $ SDeclFun pos fname vars ((iterate codom sty) !! (length vars)) tt True
+    SFix _ fname fty vars tt -> if name == fname
+                                then return $ SDeclFun pos fname vars ((iterate codom sty) !! (length vars)) tt True
+                                else return $ SDeclFun pos name [] sty def False
     _ -> return $ SDeclFun pos name [] sty def False
 resugarDecl _ = failFD4 "Si llegué acá algo esta mal jej"
 
