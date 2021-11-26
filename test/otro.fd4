@@ -1,0 +1,4 @@
+type Pedro = Nat
+let h (z : Pedro) : Pedro = z + 1
+let f (x:Nat) (z : Nat->Nat) (y : Nat) : Pedro =  z(x + 1 + y) 
+let z : Nat = f 1 h 2

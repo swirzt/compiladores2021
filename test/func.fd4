@@ -1,0 +1,3 @@
+let uno : Nat = 1
+let preds (x:Nat) : Nat = x - uno
+let y : Nat = preds 30

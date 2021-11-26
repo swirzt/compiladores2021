@@ -8,6 +8,9 @@
 module TypeChecker
   ( tc,
     tcDecl,
+    tcTy,
+    tcDeclTy,
+    domCod,
   )
 where
 
@@ -133,3 +136,81 @@ tcDecl (DeclType p n t) = do
   case mty of
     Nothing -> addTyDef n t
     Just _ -> failPosFD4 p $ n ++ " ya está declarado"
+
+--Funciones para compilar a C
+
+--Funciona como tc pero tambien devuelve el termino como TTerm
+tcTy ::
+  MonadFD4 m =>
+  -- | término a chequear
+  Term ->
+  -- | entorno de tipado
+  [(Name, Ty)] ->
+  -- | tipos de los Bound
+  [Ty] ->
+  -- | tipo del término y término transformado
+  m (Ty, TTerm)
+tcTy (V _ var@(Bound k)) _ ts = let ty = ts !! k in return $ (ty, TV var ty)
+tcTy (V p var@(Free n)) bs _ = case lookup n bs of
+  Nothing -> failPosFD4 p $ "Variable no declarada " ++ ppName n
+  Just ty -> return (ty, TV var ty)
+tcTy (V p var@(Global n)) bs _ = case lookup n bs of
+  Nothing -> failPosFD4 p $ "Variable no declarada " ++ ppName n
+  Just ty -> return (ty, TV var ty)
+tcTy (Const _ k@(CNat n)) _ _ = return (NatTy, TConst k NatTy)
+tcTy (Print p str t) bs ts = do
+  (ty, t') <- tcTy t bs ts
+  expect NatTy ty t 
+  return (ty,TPrint str t' ty)
+tcTy (IfZ p c t t') bs ts = do
+  (tyc, ttmC)<- tcTy c bs ts
+  expect NatTy tyc c
+  (tyt,ttmT)<- tcTy t bs ts
+  (tyt',ttmT') <- tcTy t' bs ts
+  expect tyt tyt' t' 
+  return (tyt, TIfZ ttmC ttmT ttmT' tyt) 
+tcTy (Lam p v ty t) bs ts = do
+  (ty',t') <- tcTy t bs (ty:ts) -- No abre terminos
+  return (FunTy ty ty', TLam v ty t' (FunTy ty ty'))
+tcTy (App p t u) bs ts = do
+  (tyt, t') <- tcTy t bs ts
+  (dom, cod) <- domCod t tyt
+  (tyu, u') <- tcTy u bs ts
+  expect dom tyu u 
+  return (cod, TApp t' u' dom cod)
+tcTy (Fix p f fty x xty t) bs ts = do
+  (dom, cod) <- domCod (V p (Free f)) fty
+  when (dom /= xty) $ do
+    failPosFD4
+      p
+      "El tipo del argumento de un fixpoint debe coincidir con el \
+      \dominio del tipo de la función"
+  (ty',t') <- tcTy t bs (xty:fty:ts)
+  expect cod ty' t
+  return (fty, TFix f fty x xty t' fty)
+tcTy (Let p v ty def t) bs ts = do
+  (ty', t') <- tcTy def bs ts
+  expect ty ty' def
+  (ty'', t'') <- tcTy t bs (ty:ts)
+  return $ (ty'', TLet v ty t' t'' ty'')
+tcTy (BinaryOp p op t u) bs ts = do
+  (tty, t') <- tcTy t bs ts
+  expect NatTy tty t
+  (uty, u') <- tcTy u bs ts
+  expect NatTy uty u
+  return $ (NatTy, TBinaryOp op t' u' NatTy)
+
+tcDeclTy :: MonadFD4 m => Decl Term -> m (Decl TTerm)
+tcDeclTy (DeclFun p n t def) = do
+  --chequear si el nombre ya está declarado
+  mty <- lookupTy n
+  case mty of
+    Nothing -> do
+      --no está declarado
+      s <- get
+      (ty,def') <- tcTy def (tyEnv s) []
+      expect t ty def -- Agregado por nosotros, espera el type de la decl
+      addTy n ty
+      return $ DeclFun p n t def' 
+    Just _ -> failPosFD4 p $ n ++ " ya está declarado"
+tcDeclTy _ = undefined

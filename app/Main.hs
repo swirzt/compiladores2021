@@ -14,9 +14,6 @@ module Main where
 
 import System.Console.Haskeline ( defaultSettings, getInputLine, runInputT, InputT )
 import Control.Monad.Catch (MonadMask)
-
---import Control.Monad
--- import Control.Monad.Trans ( MonadIO(liftIO), MonadTrans(lift) )
 import Data.List (nub,  intersperse, isPrefixOf )
 import Data.Char ( isSpace )
 import Control.Exception ( catch , IOException )
@@ -35,10 +32,11 @@ import Elab ( elab, desugarDecl, desugarTy )
 import Eval ( eval )
 import PPrint
 import MonadFD4
-import TypeChecker ( tc, tcDecl )
+import TypeChecker ( tc, tcDecl, tcDeclTy )
 import CEK
 import Bytecompile (bytecompileModule, bcWrite, bcRead, runBC)
 import System.FilePath.Windows (replaceExtension)
+import ClosureConvert
 
 prompt :: String
 prompt = "FD4> "
@@ -52,7 +50,7 @@ data Mode =
   | InteractiveCEK
   | Bytecompile 
   | RunVM
-  -- | CC
+  | CC
   -- | Canon
   -- | LLVM
   -- | Build
@@ -65,7 +63,7 @@ parseMode = (,) <$>
       <|> flag' Bytecompile (long "bytecompile" <> short 'm' <> help "Compilar a la BVM")
       <|> flag' RunVM (long "runVM" <> short 'r' <> help "Ejecutar bytecode en la BVM")
       <|> flag Interactive Interactive ( long "interactive" <> short 'i' <> help "Ejecutar en forma interactiva")
-  -- <|> flag' CC ( long "cc" <> short 'c' <> help "Compilar a código C")
+      <|> flag' CC ( long "cc" <> short 'c' <> help "Compilar a código C")
   -- <|> flag' Canon ( long "canon" <> short 'n' <> help "Imprimir canonicalización")
   -- <|> flag' LLVM ( long "llvm" <> short 'l' <> help "Imprimir LLVM resultante")
   -- <|> flag' Build ( long "build" <> short 'b' <> help "Compilar")
@@ -99,8 +97,8 @@ main = execParser opts >>= go
               runOrFail $ mapM_ bytecompileFile files
     go (RunVM,_,files) =
               runOrFail $ mapM_ bytecodeRun files
-    -- go (CC,_, files) =
-    --           runOrFail $ mapM_ ccFile files
+    go (CC,_, files) =
+              runOrFail $ mapM_ ccFile files
     -- go (Canon,_, files) =
     --           runOrFail $ mapM_ canonFile files 
     -- go (LLVM,_, files) =
@@ -181,7 +179,7 @@ typecheckDecl a@(SDeclFun pos _ _ _ _ _) = do
         output <- desugarDecl a
         case output of
           DeclFun i n ty t -> do elabTerm <- elab t
-                                 let dd = (DeclFun i n ty elabTerm)
+                                 let dd = DeclFun i n ty elabTerm
                                  tcDecl dd
                                  return dd
           _ -> failPosFD4 pos "Error interpretando una declaracion"
@@ -278,25 +276,16 @@ compilePhrase x mode = do dot <- parseIO "<interactive>" declOrTm x
                           case dot of
                            Left d  -> handleDecl d 
                            Right t -> case mode of
-                                        Interactive -> handleTerm t
-                                        InteractiveCEK -> handleTermCEK t
+                                        Interactive -> handleTerm t eval
+                                        InteractiveCEK -> handleTerm t evalCEK
                                         _ -> undefined -- para que no me moleste el linter
 
-handleTerm ::  MonadFD4 m => STerm -> m ()
-handleTerm t = do
+handleTerm ::  MonadFD4 m => STerm -> (Term -> m Term) -> m ()
+handleTerm t f = do
          elabTerm <- elab t
          s <- get
          ty <- tc elabTerm (tyEnv s)
-         te <- eval elabTerm
-         ppte <- pp te
-         printFD4 (ppte ++ " : " ++ ppTy ty)
-
-handleTermCEK :: MonadFD4 m => STerm -> m ()
-handleTermCEK t = do
-         elabTerm <- elab t
-         s <- get
-         ty <- tc elabTerm (tyEnv s)
-         te <- evalCEK elabTerm
+         te <- f elabTerm
          ppte <- pp te
          printFD4 (ppte ++ " : " ++ ppTy ty)
          
@@ -339,3 +328,25 @@ bytecompileFile fp = do xs <- loadFile fp
 bytecodeRun :: MonadFD4 m => FilePath -> m()
 bytecodeRun fp = do file <- liftIO $ bcRead fp
                     runBC file
+
+-- Para compilar en C
+typecheckDeclTy :: MonadFD4 m => SDecl STerm -> m (Decl TTerm)
+typecheckDeclTy a@(SDeclFun pos _ _ _ _ _) = do
+        output <- desugarDecl a
+        case output of
+          DeclFun i n ty t -> do elabTerm <- elab t
+                                 let dd = DeclFun i n ty elabTerm
+                                 dd' <- tcDeclTy dd
+                                 return dd'
+          _ -> failPosFD4 pos "Error interpretando una declaracion"
+typecheckDeclTy (SDeclType i n v) = do tyDesugar <- desugarTy v
+                                       let dd = DeclType i n tyDesugar
+                                       tcDecl dd
+                                       return dd
+
+ccFile :: MonadFD4 m => FilePath -> m()
+ccFile fp = do xs <- loadFile fp
+               ys <- mapM typecheckDeclTy xs
+               let imp = compilaC ys
+               liftIO $ cWrite imp (replaceExtension fp ".c")
+               return ()
