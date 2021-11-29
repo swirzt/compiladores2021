@@ -37,6 +37,7 @@ import CEK
 import Bytecompile (bytecompileModule, bcWrite, bcRead, runBC)
 import System.FilePath.Windows (replaceExtension)
 import ClosureConvert
+import Optimizations
 
 prompt :: String
 prompt = "FD4> "
@@ -85,13 +86,13 @@ main = execParser opts >>= go
      <> header "Compilador de FD4 de la materia Compiladores 2021" )
 
     go :: (Mode,Bool,[FilePath]) -> IO ()
-    go (Interactive,_,files) =
-              do runFD4 (runInputT defaultSettings (repl files Interactive))
+    go (Interactive, opt,files) =
+              do runFD4 (runInputT defaultSettings (repl files Interactive opt))
                  return ()
-    go (Typecheck,opt, files) =
+    go (Typecheck, opt, files) =
               runOrFail $ mapM_ (typecheckFile opt) files
-    go (InteractiveCEK,_, files) =
-              do runFD4 (runInputT defaultSettings (repl files InteractiveCEK))
+    go (InteractiveCEK, opt, files) =
+              do runFD4 (runInputT defaultSettings (repl files InteractiveCEK opt))
                  return () --Consultar si esto esta bien
     go (Bytecompile,_, files) =
               runOrFail $ mapM_ bytecompileFile files
@@ -116,9 +117,9 @@ runOrFail m = do
     Right v -> return v
 
 
-repl :: (MonadFD4 m, MonadMask m) => [FilePath] -> Mode -> InputT m ()
-repl args mode = do
-       lift $ catchErrors $ compileFiles args
+repl :: (MonadFD4 m, MonadMask m) => [FilePath] -> Mode -> Bool -> InputT m ()
+repl args mode opt = do
+       lift $ catchErrors $ compileFiles opt args
        s <- lift get
        when (inter s) $ liftIO $ putStrLn
          (  "Entorno interactivo para FD4.\n"
@@ -131,15 +132,15 @@ repl args mode = do
                Just "" -> loop
                Just x -> do
                        c <- liftIO $ interpretCommand x
-                       b <- lift $ catchErrors $ handleCommand c mode
+                       b <- lift $ catchErrors $ handleCommand c mode opt
                        maybe loop (`when` loop) b
 
-compileFiles ::  MonadFD4 m => [FilePath] -> m ()
-compileFiles []     = return ()
-compileFiles (x:xs) = do
+compileFiles ::  MonadFD4 m => Bool -> [FilePath] -> m ()
+compileFiles _ []     = return ()
+compileFiles opt (x:xs) = do
         modify (\s -> s { lfile = x, inter = False })
-        compileFile x
-        compileFiles xs
+        compileFile opt x
+        compileFiles opt xs
 
 loadFile ::  MonadFD4 m => FilePath -> m [SDecl STerm]
 loadFile f = do
@@ -151,8 +152,8 @@ loadFile f = do
     setLastFile filename
     parseIO filename program x
 
-compileFile ::  MonadFD4 m => FilePath -> m ()
-compileFile f = do
+compileFile ::  MonadFD4 m => Bool -> FilePath -> m ()
+compileFile opt f = do
     printFD4 ("Abriendo "++f++"...")
     let filename = reverse(dropWhile isSpace (reverse f))
     x <- liftIO $ catch (readFile filename)
@@ -160,7 +161,7 @@ compileFile f = do
                          hPutStrLn stderr ("No se pudo abrir el archivo " ++ filename ++ ": " ++ err)
                          return "")
     decls <- parseIO filename program x
-    mapM_ handleDecl decls
+    mapM_ (handleDecl opt) decls
 
 typecheckFile ::  MonadFD4 m => Bool -> FilePath -> m ()
 typecheckFile opt f = do
@@ -188,12 +189,15 @@ typecheckDecl (SDeclType i n v) = do tyDesugar <- desugarTy v
                                      tcDecl dd
                                      return dd
 
-handleDecl ::  MonadFD4 m => SDecl STerm -> m ()
-handleDecl d = do
-        output <- typecheckDecl d -- Hacer un case de la salida
+handleDecl ::  MonadFD4 m => Bool -> SDecl STerm -> m ()
+handleDecl opt d = do
+        output <- typecheckDecl d
         case output of
           DeclFun p n ty tt -> do te <- eval tt
-                                  addDecl (DeclFun p n ty te)
+                                  printFD4Debug te
+                                  tt' <- optimize (if opt then optIter else 0) te
+                                  printFD4Debug tt'
+                                  addDecl (DeclFun p n ty tt')
           _ -> return ()
 
 data Command = Compile CompileForm
@@ -253,8 +257,8 @@ helpTxt cs
 
 -- | 'handleCommand' interpreta un comando y devuelve un booleano
 -- indicando si se debe salir del programa o no.
-handleCommand ::  MonadFD4 m => Command  -> Mode -> m Bool
-handleCommand cmd mode = do
+handleCommand ::  MonadFD4 m => Command  -> Mode -> Bool -> m Bool
+handleCommand cmd mode opt = do
    s@GlEnv {..} <- get
    case cmd of
        Quit   ->  return False
@@ -264,18 +268,18 @@ handleCommand cmd mode = do
                       return True
        Compile c ->
                   do  case c of
-                          CompileInteractive e -> compilePhrase e mode
-                          CompileFile f        -> put (s {lfile=f, cantDecl=0}) >> compileFile f
+                          CompileInteractive e -> compilePhrase e mode opt
+                          CompileFile f        -> put (s {lfile=f, cantDecl=0}) >> compileFile opt f
                       return True
-       Reload ->  eraseLastFileDecls >> (getLastFile >>= compileFile) >> return True
+       Reload ->  eraseLastFileDecls >> (getLastFile >>= compileFile opt) >> return True
        PPrint e   -> printPhrase e >> return True
        Type e    -> typeCheckPhrase e >> return True
 
-compilePhrase ::  MonadFD4 m => String -> Mode -> m ()
-compilePhrase x mode = do dot <- parseIO "<interactive>" declOrTm x
-                          case dot of
-                           Left d  -> handleDecl d 
-                           Right t -> case mode of
+compilePhrase ::  MonadFD4 m => String -> Mode -> Bool -> m ()
+compilePhrase x mode opt = do dot <- parseIO "<interactive>" declOrTm x
+                              case dot of
+                                Left d  -> handleDecl opt d  
+                                Right t -> case mode of
                                         Interactive -> handleTerm t eval
                                         InteractiveCEK -> handleTerm t evalCEK
                                         _ -> undefined -- para que no me moleste el linter
@@ -350,3 +354,15 @@ ccFile fp = do xs <- loadFile fp
                let imp = compilaC ys
                liftIO $ cWrite imp (replaceExtension fp ".c")
                return ()
+
+optIter :: Int
+optIter = 10
+
+optimize :: MonadFD4 m => Int -> Term -> m Term
+optimize 0 term = return term
+optimize n term = do
+  tmm <- optimizer term
+  b <- getOptimiz
+  if b then optimize (n-1) tmm
+       else do resetOptimiz
+               return tmm

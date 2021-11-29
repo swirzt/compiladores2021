@@ -30,6 +30,9 @@ module MonadFD4
     addTy,
     addTyDef,
     catchErrors,
+    getOptimiz,
+    modifyOptimiz,
+    resetOptimiz,
     MonadFD4,
     module Control.Monad.Except,
     module Control.Monad.State,
@@ -129,6 +132,16 @@ catchErrors c =
 
 printFD4Char :: MonadFD4 m => Char -> m ()
 printFD4Char = liftIO . putChar
+
+getOptimiz :: MonadFD4 m => m Bool
+getOptimiz = do s <- get
+                return $ optimiz s
+
+resetOptimiz :: MonadFD4 m =>  m ()
+resetOptimiz = modify (\s -> s {optimiz = False})
+
+modifyOptimiz :: MonadFD4 m =>  m ()
+modifyOptimiz = modify (\s -> s {optimiz = True})
 
 ----
 -- Importante, no eta-expandir porque GHC no hace una

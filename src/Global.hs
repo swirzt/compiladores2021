@@ -22,9 +22,9 @@ data GlEnv = GlEnv
     tyEnv :: [(Name, Ty)],
     -- | Entorno de tipos definidos (TODO: Cambiar para poder recuperar los nombres de los tipos)
     typeDefs :: [(Name, Ty)],
-    optimiz :: Int
+    optimiz :: Bool
   }
 
 -- | Valor del estado inicial
 initialEnv :: GlEnv
-initialEnv = GlEnv True "" 0 [] [] [] 0
+initialEnv = GlEnv True "" 0 [] [] [] False
