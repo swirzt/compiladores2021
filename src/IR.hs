@@ -24,6 +24,9 @@ data IrDecl =
           , irDeclDef :: Ir
           , irDeclTy :: Ty
           }
+  | IrType { irDeclName :: Name
+           , irDeclTy :: Ty
+          }
   deriving Show
 
 
