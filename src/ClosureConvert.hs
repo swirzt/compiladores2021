@@ -82,7 +82,8 @@ closureConvert (TLet name tyDom tn tm tyCod) = do
 runCC :: Int -> [Decl TTerm] -> [IrDecl]
 runCC _ [] = []
 runCC n (decl : xs) = case decl of
-  DeclType {} -> runCC n xs
+  DeclType _ name ty -> let y = runCC n xs
+                        in (IrType name ty) : y
   DeclFun _ name ty tt ->
     let freevars = freeVarsTTerm tt
         ((ir, (k, _)), xx) = runWriter $ runStateT (closureConvert tt) (n, freevars)
