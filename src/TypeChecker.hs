@@ -200,6 +200,18 @@ tcTy (BinaryOp p op t u) bs ts = do
   expect NatTy uty u
   return $ (NatTy, TBinaryOp op t' u' NatTy)
 
+changeTy :: TTerm -> Ty -> TTerm
+changeTy (TV var _) t = TV var t
+changeTy (TConst c _) t = TConst c t
+changeTy (TLam n ty tm _) t = TLam n ty tm t
+changeTy (TApp tm1 tm2 ty _) t = TApp tm1 tm2 ty t
+changeTy (TPrint str tm _) t = TPrint str tm t
+changeTy (TBinaryOp bop tm1 tm2 _) t = TBinaryOp bop tm1 tm2 t
+changeTy (TFix f fTy var varTy tm _) t = TFix f fTy var varTy tm t 
+changeTy (TIfZ tmb tmt tmf _) t = TIfZ tmb tmt tmf t
+changeTy (TLet name ty tm tm' _) t = TLet name ty tm tm' t 
+
+
 tcDeclTy :: MonadFD4 m => Decl Term -> m (Decl TTerm)
 tcDeclTy (DeclFun p n t def) = do
   --chequear si el nombre ya está declarado
@@ -211,6 +223,7 @@ tcDeclTy (DeclFun p n t def) = do
       (ty,def') <- tcTy def (tyEnv s) []
       expect t ty def -- Agregado por nosotros, espera el type de la decl
       addTy n ty
-      return $ DeclFun p n t def' 
+      let deff = changeTy def' t
+      return $ DeclFun p n t deff 
     Just _ -> failPosFD4 p $ n ++ " ya está declarado"
 tcDeclTy _ = undefined

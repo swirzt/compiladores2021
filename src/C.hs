@@ -9,7 +9,7 @@ import Debug.Trace
 import Data.Maybe
 
 ty2Doc :: Ty -> Doc a
-ty2Doc NatTy = pretty "uint64_t"
+ty2Doc NatTy = pretty "nat"
 ty2Doc (NameTy n _) = name n
 ty2Doc (FunTy d c) = pretty "clos"
 
@@ -17,6 +17,11 @@ args2Doc :: [(Name, Maybe Ty)] -> [Doc a]
 args2Doc [] = []
 args2Doc ((n,Nothing):xs) = (pretty "clos" <+> name n) : args2Doc xs
 args2Doc ((n,Just ty):xs) = (ty2Doc ty <+> name n) : args2Doc xs
+
+argsTy2Doc :: [(b, Maybe Ty)] -> [Doc a]
+argsTy2Doc [] = []
+argsTy2Doc ((_,Nothing):xs) = (pretty "clos") : argsTy2Doc xs
+argsTy2Doc ((_,Just ty):xs) = (ty2Doc ty) : argsTy2Doc xs
 
 decl2doc :: IrDecl -> Doc a
 decl2doc (IrVal n t ty) = ty2Doc ty <+> name n <> semi
@@ -28,7 +33,7 @@ decl2doc (IrType n ty) = pretty "#define" <+> name n <+> ty2Doc ty
 
 fd4Main :: [IrDecl] -> Doc a
 fd4Main xs =
-  pretty "uint64_t fd4main()"
+  pretty "nat fd4main()"
     <+> braces (nest 2 (line <> vsep (vals2doc xs ++ [pretty "return 0;"])) <> line)
   where
     vals2doc :: [IrDecl] -> [Doc a]
@@ -40,30 +45,15 @@ fd4Main xs =
 name :: String -> Doc a
 name n = pretty $ "fd4_" ++ n --prefijo fd4 para evitar colision con nombres de C.
 
-stmt :: Doc a -> Doc a
-stmt x = parens (braces (nest 2 (line <> x <> semi) <> line))
-
 stmts :: [Doc a] -> Doc a
 stmts xs =
   parens $
     braces $
       foldr (\x ds -> nest 2 (line <> x <> semi) <> ds) line xs
 
-u64 :: Doc a
-u64 = parens (pretty "uint64_t")
-
-voidptr :: Doc a
-voidptr = parens (pretty "void *")
-
-argsTy2Doc :: [(Ir, Maybe Ty)] -> [Doc a]
-argsTy2Doc [] = []
-argsTy2Doc ((_,Nothing):xs) = (pretty "clos") : argsTy2Doc xs
-argsTy2Doc ((_,Just ty):xs) = (ty2Doc ty) : argsTy2Doc xs
-
 ir2doc :: Ir -> Doc a
 ir2doc (IrVar n) = name n
 ir2doc (IrGlobal n) = name n
--- ir2doc (IrCall f args) = parens (pretty "(void* (*) (void*, void*))" <+> ir2doc f) <> tupled (map ((voidptr <>) . ir2doc) args)
 ir2doc (IrCall f args dom codom) = parens (parens (ty2Doc codom <+> pretty "(*)" <+> tupled (argsTy2Doc args)) <+> ir2doc f) <> tupled (map (\(ir,_) -> ir2doc ir) args)
 ir2doc (IrConst (CNat n)) = pretty n
 ir2doc (IrBinaryOp Add a b) = ir2doc a <+> pretty "+" <+> ir2doc b
@@ -72,11 +62,7 @@ ir2doc (IrLet n t t' tyL ty) = stmts [hsep [ty2Doc tyL, name n, pretty "=", ir2d
 ir2doc (IrIfZ c a b ty) = sep [ir2doc c, nest 2 (pretty "?" <+> ir2doc b), nest 2 (colon <+> ir2doc a)]
 ir2doc (IrPrint str t) = stmts [pretty "wprintf" <> parens (pretty "L" <> pretty (show str)), irPrintN (ir2doc t)]
 ir2doc (MkClosure f args ty) = pretty "fd4_mkclosure" <> tupled (name f : pretty (length args) : map ir2doc args)
-ir2doc (IrAccess t i) = parens (ir2doc t) <> brackets (pretty i)
-
-op2doc :: BinaryOp -> Doc a
-op2doc Add = pretty "+"
-op2doc Sub = pretty "-"
+ir2doc (IrAccess t i) = ir2doc t <> brackets (pretty i)
 
 prelude :: Doc a
 prelude =
@@ -86,14 +72,14 @@ prelude =
     <> line
     <> pretty "#define clos void**"
     <> line
-    <> pretty "extern void *fd4_mkclosure(void*, int, ...);"
+    <> pretty "#define nat uint64_t"
     <> line
-    <> pretty "extern uint64_t fd4_printn(uint64_t);"
+    <> pretty "extern clos fd4_mkclosure(void*, int, ...);"
     <> line
-    <> pretty "extern uint64_t fd4_sub(uint64_t, uint64_t);"
+    <> pretty "extern nat fd4_printn(nat);"
     <> line
-
-   
+    <> pretty "extern nat fd4_sub(nat, nat);"
+    <> line
 
 irPrintN :: Doc a -> Doc a
 irPrintN x = pretty "fd4_printn" <> parens x
