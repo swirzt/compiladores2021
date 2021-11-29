@@ -1,3 +1,7 @@
 let uno : Nat = 1
 let preds (x:Nat) : Nat = x - uno
 let y : Nat = preds 30
+type Pedro = Nat
+let multi (n m : Nat) (k : Pedro) : Nat = n + m + k
+let f : Nat -> Nat = fix (f : Nat -> Nat) (x : Nat) -> x
+let z : Nat = multi y 1 1

@@ -235,7 +235,7 @@ st2doc at (SFix _ f fty xs m) =
     sep
       [ sep
           [ keywordColor (pretty "fix"),
-            sbinding2doc ((f, fty) : xs),
+            sbinding2doc (([f], fty) : xs),
             opColor (pretty "->")
           ],
         nest 2 (st2doc False m)
@@ -299,10 +299,15 @@ binding2doc :: (Name, Ty) -> Doc AnsiStyle
 binding2doc (x, ty) =
   parens (sep [name2doc x, pretty ":", ty2doc ty])
 
-sbinding2doc :: [(Name, STy)] -> Doc AnsiStyle
+sname2doc :: [Name] -> Doc AnsiStyle
+sname2doc [] = mempty
+sname2doc [x] = name2doc x
+sname2doc (x:xs) = name2doc x <+> sname2doc xs
+
+sbinding2doc :: [([Name], STy)] -> Doc AnsiStyle
 sbinding2doc [] = mempty
-sbinding2doc [(x, ty)] = parens (sep [name2doc x, pretty ":", sty2doc ty])
-sbinding2doc ((x, ty) : xs) = sep [parens (sep [name2doc x, pretty ":", sty2doc ty]), sbinding2doc xs]
+sbinding2doc [(x, ty)] = parens (sep [sname2doc x, pretty ":", sty2doc ty])
+sbinding2doc ((x, ty) : xs) = sep [parens (sep [sname2doc x, pretty ":", sty2doc ty]), sbinding2doc xs]
 
 -- | Pretty printing de términos (String)
 pp :: MonadFD4 m => Term -> m String

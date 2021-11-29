@@ -38,7 +38,7 @@ data STy
   = SNatTy
   | SFunTy {dom :: STy, codom :: STy}
   | SVarTy Name
-  deriving (Show)
+  deriving (Show, Eq)
 
 type Name = String
 
@@ -64,7 +64,7 @@ data SDecl a
   | SDeclFun
       { sdeclPos :: Pos,
         sdeclName :: Name,
-        sdeclVars :: [(Name, STy)],
+        sdeclVars :: [([Name], STy)],
         sdeclType :: STy,
         sdeclDef :: a,
         sdeclRec :: Bool
@@ -90,14 +90,14 @@ data Tm info var
 data STm info var
   = SV info var
   | SConst info Const
-  | SLam info [(Name, STy)] (STm info var)
+  | SLam info [([Name], STy)] (STm info var)
   | SApp info (STm info var) (STm info var)
   | SPrint info String (STm info var)
   | SPrintEta info String
   | SBinaryOp info BinaryOp (STm info var) (STm info var)
-  | SFix info Name STy [(Name, STy)] (STm info var)
+  | SFix info Name STy [([Name], STy)] (STm info var)
   | SIfZ info (STm info var) (STm info var) (STm info var)
-  | SLet info Name [(Name, STy)] STy (STm info var) (STm info var) Bool
+  | SLet info Name [([Name], STy)] STy (STm info var) (STm info var) Bool
   -- Si la primer lista de Let es vacio es sin sugar
   deriving (Show, Functor)
 
