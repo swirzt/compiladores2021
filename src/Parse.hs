@@ -143,15 +143,29 @@ atom =
     <|> parens expr
     <|> printParse
 
+multivar :: P [Name]
+multivar = (do
+  v <- var
+  vs <- multivar
+  return (v : vs))
+  <|> return []
+
 -- parsea un par (variable : tipo)
-binding :: P (Name, STy)
+binding :: P ([Name], STy)
 binding = do
+  v <- multivar
+  reservedOp ":"
+  ty <- typeP
+  return (v, ty)
+
+singleBinding :: P (Name, STy)
+singleBinding = do
   v <- var
   reservedOp ":"
   ty <- typeP
   return (v, ty)
 
-binders :: P [(Name, STy)]
+binders :: P [([Name], STy)]
 binders =
   ( do
       x <- parens binding
@@ -183,7 +197,7 @@ fix :: P STerm
 fix = do
   i <- getPos
   reserved "fix"
-  (f, fty) <- parens binding
+  (f, fty) <- parens singleBinding
   xs <- binders
   reservedOp "->"
   t <- expr
@@ -200,7 +214,7 @@ ifz = do
   e <- expr
   return (SIfZ i c t e)
 
-parseDef :: P (Name, [(Name, STy)], STy)
+parseDef :: P (Name, [([Name], STy)], STy)
 parseDef = do
   v <- var
   mvars <- binders
