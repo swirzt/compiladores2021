@@ -3,7 +3,6 @@ module CEK where
 import Common (Pos (NoPos))
 import Lang
 import MonadFD4
-import PPrint (pp)
 import Prelude
 
 data Val = Num Int | Clos ClosCEK
@@ -37,7 +36,7 @@ search (V info (Global i)) env kont = do
   case val of
     Just x -> search x env kont
     Nothing -> failPosFD4 info "Error al evaluar el marco de V, variable indefinida"
-search (Const _ (CNat c)) env kont = destroy (Num c) kont
+search (Const _ (CNat c)) _ kont = destroy (Num c) kont
 search f@(Lam _ _ _ _) env kont = destroy (Clos $ close f env) kont
 search f@(Fix _ _ _ _ _ _) env kont = destroy (Clos $ close f env) kont
 search (Let _ _ _ t t') env kont = search t env (FLet env t' : kont)
@@ -56,16 +55,16 @@ destroy (Num n) (FOpL e op tm : xs) = search tm e (FOpR n op : xs)
 destroy (Num m) (FOpR x op : xs) = case op of
   Add -> destroy (Num $ x + m) xs
   Sub -> destroy (Num $ max 0 (x - m)) xs
-destroy (Num 0) (FIfz e t1 t2 : xs) = search t1 e xs
-destroy (Num _) (FIfz e t1 t2 : xs) = search t2 e xs
+destroy (Num 0) (FIfz e t1 _ : xs) = search t1 e xs
+destroy (Num _) (FIfz e _ t2 : xs) = search t2 e xs
 destroy (Clos clos) (FAppL e tm : xs) = search tm e (FAppR clos : xs)
 destroy v (FAppR clos : xs) = case clos of
   ClosFun e tm _ -> search tm (v : e) xs
   a@(ClosFix e tmx _) -> search tmx (v : Clos a : e) xs
 destroy v (FLet e tm : xs) = search tm (v : e) xs
 destroy v [] = return v
-destroy v (FPrint s : xs) = failFD4 "Error, quise imprimir un fun o fix." -- Creo que este no es necesario, daría error de tipo antes
-destroy x k = undefined -- Para que el linter no moleste
+destroy _ (FPrint _ : _) = failFD4 "Error, quise imprimir un fun o fix." -- Creo que este no es necesario, daría error de tipo antes
+destroy _ _ = undefined -- Para que el linter no moleste
 
 open :: Val -> Term
 open (Num c) = Const NoPos (CNat c)

@@ -14,7 +14,7 @@ optimizer (BinaryOp info bOp (Const _ (CNat c1)) (Const _ (CNat c2))) = do
   return $ Const info $ CNat $ semOp bOp c1 c2
 
 -- constant propagation
-optimizer (Let info name ty (Const _ c) tm) = do
+optimizer (Let _ _ _ (Const _ c) tm) = do
   let tm' = varChanger (\_ p n -> V p (Free n)) replaceVar tm
   modifyOptimiz
   optimizer tm'

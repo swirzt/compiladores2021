@@ -3,7 +3,6 @@ module ClosureConvert where
 import C
 import Control.Monad.State
 import Control.Monad.Writer
-import Debug.Trace (traceM)
 import IR
 import Lang
 import Subst
@@ -22,11 +21,11 @@ makeLet tm _ [] True _ = tm
 makeLet tm name ((x, ty) : xs) True t = IrLet x (IrVar name) (makeLet tm name xs False t) ty t
 
 closureConvert :: TTerm -> StateT (Int, [(Name, Ty)]) (Writer [IrDecl]) Ir
-closureConvert (TV var ty) = case var of
+closureConvert (TV var _) = case var of
   Free name -> return $ IrVar name
   Global name -> return $ IrGlobal name
-  Bound n -> undefined
-closureConvert (TConst var ty) = return $ IrConst var
+  Bound _ -> undefined
+closureConvert (TConst var _) = return $ IrConst var
 closureConvert (TLam name tv tm ty) = do
   (_, fvars) <- get
   vname <- generateName name -- Le damos un nombre unico a la variable ligada
@@ -49,7 +48,7 @@ closureConvert (TPrint str tm ty) = do
   itm <- closureConvert tm
   pname <- generateName "p"
   return $ IrLet pname itm (IrPrint str (IrVar pname)) ty ty
-closureConvert (TBinaryOp bop tm1 tm2 ty) = do
+closureConvert (TBinaryOp bop tm1 tm2 _) = do
   itm1 <- closureConvert tm1
   itm2 <- closureConvert tm2
   return $ IrBinaryOp bop itm1 itm2

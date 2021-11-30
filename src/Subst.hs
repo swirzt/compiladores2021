@@ -23,14 +23,14 @@ varChanger local bound t = go 0 t
   where
     go n (V p (Bound i)) = bound n p i
     go n (V p (Free x)) = local n p x
-    go n (V p (Global x)) = V p (Global x)
-    go n (Lam p y ty t) = Lam p y ty (go (n + 1) t)
+    go _ (V p (Global x)) = V p (Global x)
+    go n (Lam p y ty tm) = Lam p y ty (go (n + 1) tm)
     go n (App p l r) = App p (go n l) (go n r)
-    go n (Fix p f fty x xty t) = Fix p f fty x xty (go (n + 2) t)
-    go n (IfZ p c t e) = IfZ p (go n c) (go n t) (go n e)
-    go n t@(Const _ _) = t
-    go n (Print p str t) = Print p str (go n t)
-    go n (BinaryOp p op t u) = BinaryOp p op (go n t) (go n u)
+    go n (Fix p f fty x xty tm) = Fix p f fty x xty (go (n + 2) tm)
+    go n (IfZ p co tr fa) = IfZ p (go n co) (go n tr) (go n fa)
+    go _ tm@(Const _ _) = tm
+    go n (Print p str tm) = Print p str (go n tm)
+    go n (BinaryOp p op tm um) = BinaryOp p op (go n tm) (go n um)
     go n (Let p v vty m o) = Let p v vty (go n m) (go (n + 1) o)
 
 -- `openN [nn,..,n0] t` reemplaza las primeras (n+1) variables ligadas
@@ -109,16 +109,16 @@ varChangerTTerm ::
   TTerm
 varChangerTTerm local bound t = go 0 t
   where
-    go n (TV (Bound i) t) = bound n t i
-    go n (TV (Free x) t) = local n t x
-    go n tm@(TV (Global x) t) = tm
-    go n (TLam y ty t ty') = TLam y ty (go (n + 1) t) ty'
+    go n (TV (Bound i) tm) = bound n tm i
+    go n (TV (Free x) tm) = local n tm x
+    go _ tm@(TV (Global _) _) = tm
+    go n (TLam y ty tm ty') = TLam y ty (go (n + 1) tm) ty'
     go n (TApp l r t1 t2) = TApp (go n l) (go n r) t1 t2
-    go n (TFix f fty x xty t ty) = TFix f fty x xty (go (n + 2) t) ty
-    go n (TIfZ c t e ty) = TIfZ (go n c) (go n t) (go n e) ty
-    go n t@(TConst _ _) = t
-    go n (TPrint str t ty) = TPrint str (go n t) ty
-    go n (TBinaryOp op t u ty) = TBinaryOp op (go n t) (go n u) ty
+    go n (TFix f fty x xty tm ty) = TFix f fty x xty (go (n + 2) tm) ty
+    go n (TIfZ co tr fa ty) = TIfZ (go n co) (go n tr) (go n fa) ty
+    go _ tm@(TConst _ _) = tm
+    go n (TPrint str tm ty) = TPrint str (go n tm) ty
+    go n (TBinaryOp op tm um ty) = TBinaryOp op (go n tm) (go n um) ty
     go n (TLet v vty m o ty) = TLet v vty (go n m) (go (n + 1) o) ty
 
 openNTTerm :: [Name] -> TTerm -> TTerm

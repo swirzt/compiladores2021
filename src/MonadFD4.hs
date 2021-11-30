@@ -88,21 +88,25 @@ eraseLastFileDecls :: MonadFD4 m => m ()
 eraseLastFileDecls = do
   s <- get
   let n = cantDecl s
-      (era, rem) = splitAt n (glb s)
+      (era, remaining) = splitAt n (glb s)
       tyEnv' = deleteTy (map declName era) (tyEnv s)
-  modify (\s -> s {glb = rem, cantDecl = 0, tyEnv = tyEnv'})
+  modify (\st -> st {glb = remaining, cantDecl = 0, tyEnv = tyEnv'})
   where
     deleteTy xs ps = deleteFirstsBy (\x y -> fst x == fst y) ps (map (flip (,) NatTy) xs)
 
 hasName :: Name -> Decl a -> Bool
 hasName nm (DeclFun {declName = nm'}) = nm == nm'
+hasName nm (DeclType _ nm' _) = nm == nm'
 
 lookupDecl :: MonadFD4 m => Name -> m (Maybe Term)
 lookupDecl nm = do
   s <- get
-  case filter (hasName nm) (glb s) of
-    (DeclFun {declBody = e}) : _ -> return (Just e)
-    [] -> return Nothing
+  ret (filter (hasName nm) (glb s))
+  where
+    ret xs = case xs of
+      (DeclFun {declBody = e}) : _ -> return (Just e)
+      (DeclType _ _ _) : ys -> ret ys
+      [] -> return Nothing
 
 lookupTy :: MonadFD4 m => Name -> m (Maybe Ty)
 lookupTy nm = do

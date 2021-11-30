@@ -1,17 +1,15 @@
 module C (ir2C) where
 
-import Data.Maybe
 import Data.Text (unpack)
-import Data.Text.Prettyprint.Doc
-import Data.Text.Prettyprint.Doc.Render.Terminal (renderStrict)
-import Debug.Trace
 import IR
 import Lang
+import Prettyprinter
+import Prettyprinter.Render.Terminal (renderStrict)
 
 ty2Doc :: Ty -> Doc a
 ty2Doc NatTy = pretty "nat"
 ty2Doc (NameTy n _) = name n
-ty2Doc (FunTy d c) = pretty "clos"
+ty2Doc (FunTy _ _) = pretty "clos"
 
 args2Doc :: [(Name, Maybe Ty)] -> [Doc a]
 args2Doc [] = []
@@ -24,7 +22,7 @@ argsTy2Doc ((_, Nothing) : xs) = (pretty "clos") : argsTy2Doc xs
 argsTy2Doc ((_, Just ty) : xs) = (ty2Doc ty) : argsTy2Doc xs
 
 decl2doc :: IrDecl -> Doc a
-decl2doc (IrVal n t ty) = ty2Doc ty <+> name n <> semi
+decl2doc (IrVal n _ ty) = ty2Doc ty <+> name n <> semi
 decl2doc (IrFun n args t ty) =
   let tyReturn = ty2Doc (tcodom ty)
    in tyReturn <+> name n <+> tupled (args2Doc args)
@@ -38,8 +36,8 @@ fd4Main xs =
   where
     vals2doc :: [IrDecl] -> [Doc a]
     vals2doc [] = []
-    vals2doc [IrVal n t ty] = [name n <+> pretty "=" <+> ir2doc t <> semi, irPrintN (name n), semi]
-    vals2doc (IrVal n t ty : ds) = (name n <+> pretty "=" <+> ir2doc t <> semi) : vals2doc ds
+    vals2doc [IrVal n t _] = [name n <+> pretty "=" <+> ir2doc t <> semi, irPrintN (name n), semi]
+    vals2doc (IrVal n t _ : ds) = (name n <+> pretty "=" <+> ir2doc t <> semi) : vals2doc ds
     vals2doc (_ : ds) = vals2doc ds
 
 name :: String -> Doc a
@@ -54,14 +52,14 @@ stmts xs =
 ir2doc :: Ir -> Doc a
 ir2doc (IrVar n) = name n
 ir2doc (IrGlobal n) = name n
-ir2doc (IrCall f args dom codom) = parens (parens (ty2Doc codom <+> pretty "(*)" <+> tupled (argsTy2Doc args)) <+> ir2doc f) <> tupled (map (\(ir, _) -> ir2doc ir) args)
+ir2doc (IrCall f args _ codomi) = parens (parens (ty2Doc codomi <+> pretty "(*)" <+> tupled (argsTy2Doc args)) <+> ir2doc f) <> tupled (map (\(ir, _) -> ir2doc ir) args)
 ir2doc (IrConst (CNat n)) = pretty n
 ir2doc (IrBinaryOp Add a b) = ir2doc a <+> pretty "+" <+> ir2doc b
 ir2doc (IrBinaryOp Sub a b) = pretty "fd4_sub" <> tupled [ir2doc a, ir2doc b]
-ir2doc (IrLet n t t' tyL ty) = stmts [hsep [ty2Doc tyL, name n, pretty "=", ir2doc t] <> semi <> line <> ir2doc t']
-ir2doc (IrIfZ c a b ty) = sep [ir2doc c, nest 2 (pretty "?" <+> ir2doc b), nest 2 (colon <+> ir2doc a)]
+ir2doc (IrLet n t t' tyL _) = stmts [hsep [ty2Doc tyL, name n, pretty "=", ir2doc t] <> semi <> line <> ir2doc t']
+ir2doc (IrIfZ c a b _) = sep [ir2doc c, nest 2 (pretty "?" <+> ir2doc b), nest 2 (colon <+> ir2doc a)]
 ir2doc (IrPrint str t) = stmts [pretty "wprintf" <> parens (pretty "L" <> pretty (show str)), irPrintN (ir2doc t)]
-ir2doc (MkClosure f args ty) = pretty "fd4_mkclosure" <> tupled (name f : pretty (length args) : map ir2doc args)
+ir2doc (MkClosure f args _) = pretty "fd4_mkclosure" <> tupled (name f : pretty (length args) : map ir2doc args)
 ir2doc (IrAccess t i) = ir2doc t <> brackets (pretty i)
 
 prelude :: Doc a

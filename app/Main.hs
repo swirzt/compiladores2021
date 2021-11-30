@@ -86,13 +86,11 @@ main = execParser opts >>= go
      <> header "Compilador de FD4 de la materia Compiladores 2021" )
 
     go :: (Mode,Bool,[FilePath]) -> IO ()
-    go (Interactive, opt,files) =
-              do runFD4 (runInputT defaultSettings (repl files Interactive opt))
+    go (Interactive, opt,files) = runFD4 (runInputT defaultSettings (repl files Interactive opt)) >>
                  return ()
     go (Typecheck, opt, files) =
               runOrFail $ mapM_ (typecheckFile opt) files
-    go (InteractiveCEK, opt, files) =
-              do runFD4 (runInputT defaultSettings (repl files InteractiveCEK opt))
+    go (InteractiveCEK, opt, files) = runFD4 (runInputT defaultSettings (repl files InteractiveCEK opt)) >>
                  return () --Consultar si esto esta bien
     go (Bytecompile, opt, files) =
               runOrFail $ mapM_ (bytecompileFile opt) files
@@ -185,10 +183,10 @@ typecheckDecl opt a@(SDeclFun pos _ _ _ _ _) = do
                                  tcDecl dd
                                  return dd
           _ -> failPosFD4 pos "Error interpretando una declaracion"
-typecheckDecl opt (SDeclType i n v) = do tyDesugar <- desugarTy v
-                                         let dd = DeclType i n tyDesugar
-                                         tcDecl dd
-                                         return dd
+typecheckDecl _ (SDeclType i n v) = do tyDesugar <- desugarTy v
+                                       let dd = DeclType i n tyDesugar
+                                       tcDecl dd
+                                       return dd
 
 handleDecl ::  MonadFD4 m => Bool -> SDecl STerm -> m ()
 handleDecl opt d = do
@@ -300,7 +298,7 @@ printPhrase x =
     x' <- parseIO "<interactive>" tm x
     ex <- elab x'
     t  <- case x' of
-           (SV p f) -> maybe ex id <$> lookupDecl f
+           (SV _ f) -> maybe ex id <$> lookupDecl f
            _       -> return ex
     printFD4 "STerm:"
     printFD4 (show x')

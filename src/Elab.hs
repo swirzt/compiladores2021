@@ -17,7 +17,7 @@ import Subst
 -- | 'desugar' transforma un termino con azucar sintactico a un NTerm
 desugar :: MonadFD4 m => STerm -> m NTerm
 desugar (SV info var) = return $ V info var
-desugar (SConst info const) = return $ Const info const
+desugar (SConst info c) = return $ Const info c
 desugar (SLam info [] _) = failPosFD4 info "No se dio un argumento a la función"
 desugar (SLam info (([], _) : _) _) = failPosFD4 info "No se dio un argumento a la función"
 desugar (SLam info [([n], ty)] stm) = do
@@ -159,7 +159,7 @@ resugarDecl (DeclFun pos name ty def) = do
   sty <- resugarTy ty
   case def of
     SLam _ vars tt -> return $ SDeclFun pos name vars ((iterate codom sty) !! (numVars vars)) tt False
-    SFix _ fname fty vars tt ->
+    SFix _ fname _ vars tt ->
       if name == fname
         then return $ SDeclFun pos fname vars ((iterate codom sty) !! (numVars vars)) tt True
         else return $ SDeclFun pos name [] sty def False
@@ -228,7 +228,7 @@ resugarTy (FunTy x y) = do
   xx <- resugarTy x
   yy <- resugarTy y
   return (SFunTy xx yy)
-resugarTy (NameTy n ty) = return $ SVarTy n
+resugarTy (NameTy n _) = return $ SVarTy n
 
 -- getTy :: TTerm -> Ty
 -- getTy (TV _ t) = t

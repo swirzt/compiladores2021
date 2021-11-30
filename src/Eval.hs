@@ -28,17 +28,17 @@ eval (V _ (Global nm)) = do
   case mtm of
     Nothing -> failFD4 $ "Error de ejecución: variable no declarada: " ++ ppName nm
     Just t -> eval t
-eval (App p l r) = do
+eval (App _ l r) = do
   le <- eval l
   re <- eval r
   case (le, re) of
-    (Lam _ y _ m, n) ->
+    (Lam _ _ _ m, n) ->
       eval (subst n m)
-    (ff@(Fix _ f _ _ _ t), n) ->
+    (ff@(Fix _ _ _ _ _ t), n) ->
       eval (substN [ff, n] t)
     _ ->
       abort ("Error de tipo en runtime " ++ show (le, re))
-eval (Print p str t) = do
+eval (Print _ str t) = do
   te <- eval t
   case te of
     Const _ (CNat n) -> do
@@ -51,12 +51,12 @@ eval (BinaryOp p op t u) = do
   case (te, ue) of
     (Const _ (CNat n), Const _ (CNat m)) -> return $ Const p (CNat (semOp op n m))
     _ -> abort "Error de tipo en runtime!"
-eval (IfZ p c t e) = do
+eval (IfZ _ c t e) = do
   ce <- eval c
   case ce of
     Const _ (CNat 0) -> eval t
     Const _ (CNat _) -> eval e
-    c' -> abort "Error de tipo en runtime!"
+    _ -> abort "Error de tipo en runtime!"
 eval (Let _ _ _ m n) = do
   v <- eval m
   eval (subst v n)

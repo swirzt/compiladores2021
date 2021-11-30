@@ -133,8 +133,8 @@ bc (IfZ _ tmb tmt tmf) = do
   let tLen = length tst + 2 -- Tengo que saltear el SKIP y el largo del False
   let fLen = length tsf
   return $ tsb ++ [IFZ, tLen] ++ tst ++ [SKIP, fLen] ++ tsf
-bc (V _ (Free name)) = undefined
-bc (V _ (Global n)) = undefined
+bc (V _ (Free _)) = undefined
+bc (V _ (Global _)) = undefined
 
 bt :: MonadFD4 m => Term -> m Bytecode
 bt (App _ tm1 tm2) = do
@@ -146,7 +146,6 @@ bt (IfZ _ tmb tmt tmf) = do
   tst <- bt tmt
   tsf <- bt tmf
   let tLen = length tst
-  let fLen = length tsf
   return $ tsb ++ [IFZ, tLen] ++ tst ++ tsf
 bt (Let _ _ _ tm1 tm2) = do
   ts1 <- bc tm1
@@ -158,9 +157,6 @@ bt t = do
 
 stringToUnicode :: String -> [Int]
 stringToUnicode xs = map ord xs
-
-unicodeToString :: [Int] -> String
-unicodeToString xs = map chr xs
 
 type Module = [Decl Term]
 
@@ -244,14 +240,14 @@ runBC' (FUNCTION : l : c) e s = runBC' (drop l c) e (Fun e (take l c) : s)
 runBC' (RETURN : _) _ (v : (RA e c) : s) = runBC' c e (v : s)
 runBC' (RETURN : _) _ _ = failFD4 "Error al ejecutar RETURN"
 runBC' (SHIFT : c) e (v : s) = runBC' c (v : e) s
-runBC' (DROP : c) (v : e) s = runBC' c e s
-runBC' (PRINTN : c) e st@(I n : s) = do
+runBC' (DROP : c) (_ : e) s = runBC' c e s
+runBC' (PRINTN : c) e st@(I n : _) = do
   printFD4 (show n)
   runBC' c e st
 runBC' (PRINTN : _) _ _ = failFD4 "Error al ejecutar PRINTN"
 runBC' (PRINT : c) e s = printStr c e s
-runBC' (FIX : c) e (Fun ef cf : s) = let efix = Fun efix cf : e in runBC' c e (Fun efix cf : s)
-runBC' (FIX : c) _ _ = failFD4 "Error al ejecutar FIX"
+runBC' (FIX : c) e (Fun _ cf : s) = let efix = Fun efix cf : e in runBC' c e (Fun efix cf : s)
+runBC' (FIX : _) _ _ = failFD4 "Error al ejecutar FIX"
 runBC' (STOP : _) _ _ = return ()
 runBC' (IFZ : tLen : c) e (I n : s) =
   if n == 0
@@ -259,7 +255,7 @@ runBC' (IFZ : tLen : c) e (I n : s) =
     else runBC' (drop tLen c) e s
 runBC' (IFZ : _) _ _ = failFD4 "Error al ejecutar IFZ"
 runBC' (SKIP : len : c) e s = runBC' (drop len c) e s
-runBC' (TAILCALL : c) e (v : Fun ef cf : s) = runBC' cf (v : ef) s
+runBC' (TAILCALL : _) _ (v : Fun ef cf : s) = runBC' cf (v : ef) s
 runBC' (TAILCALL : _) _ _ = failFD4 "Error al ejecutar TAILCALL"
 runBC' _ _ _ = failFD4 "Pasaron cosas"
 

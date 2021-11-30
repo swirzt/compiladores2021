@@ -30,8 +30,8 @@ instance Eq Ty where
   NatTy == FunTy _ _ = False
   FunTy _ _ == NatTy = False
   FunTy x y == FunTy w z = x == w && y == z
-  NameTy n t == x = t == x
-  x == NameTy n t = x == t
+  NameTy _ t == x = t == x
+  x == NameTy _ t = x == t
 
 -- | AST de Tipos con Sugar
 data STy

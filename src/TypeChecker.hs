@@ -38,41 +38,41 @@ tc (V p (Free n)) bs = case lookup n bs of
 tc (V p (Global n)) bs = case lookup n bs of
   Nothing -> failPosFD4 p $ "Variable no declarada " ++ ppName n
   Just ty -> return ty
-tc (Const _ (CNat n)) _ = return NatTy
-tc (Print p str t) bs = do
+tc (Const _ (CNat _)) _ = return NatTy
+tc (Print _ _ t) bs = do
   ty <- tc t bs
   expect NatTy ty t
-tc (IfZ p c t t') bs = do
+tc (IfZ _ c t t') bs = do
   tyc <- tc c bs
   expect NatTy tyc c
   tyt <- tc t bs
   tyt' <- tc t' bs
   expect tyt tyt' t'
-tc (Lam p v ty t) bs = do
+tc (Lam _ v ty t) bs = do
   ty' <- tc (open v t) ((v, ty) : bs)
   return (FunTy ty ty')
-tc (App p t u) bs = do
+tc (App _ t u) bs = do
   tyt <- tc t bs
-  (dom, cod) <- domCod t tyt
+  (domm, codd) <- domCod t tyt
   tyu <- tc u bs
-  expect dom tyu u
-  return cod
+  expect domm tyu u
+  return codd
 tc (Fix p f fty x xty t) bs = do
-  (dom, cod) <- domCod (V p (Free f)) fty
-  when (dom /= xty) $ do
+  (domm, codd) <- domCod (V p (Free f)) fty
+  when (domm /= xty) $ do
     failPosFD4
       p
       "El tipo del argumento de un fixpoint debe coincidir con el \
       \dominio del tipo de la función"
   let t' = openN [f, x] t
   ty' <- tc t' ((x, xty) : (f, fty) : bs)
-  expect cod ty' t'
+  expect codd ty' t'
   return fty
-tc (Let p v ty def t) bs = do
+tc (Let _ v ty def t) bs = do
   ty' <- tc def bs
   expect ty ty' def
   tc (open v t) ((v, ty) : bs)
-tc (BinaryOp p op t u) bs = do
+tc (BinaryOp _ _ t u) bs = do
   tty <- tc t bs
   expect NatTy tty t
   uty <- tc t bs
@@ -113,8 +113,8 @@ expect ty ty' t =
 -- | 'domCod chequea que un tipo sea función
 -- | devuelve un par con el tipo del dominio y el codominio de la función
 domCod :: MonadFD4 m => Term -> Ty -> m (Ty, Ty)
-domCod t (FunTy d c) = return (d, c)
-domCod t (NameTy n ty) = domCod t ty
+domCod _ (FunTy d c) = return (d, c)
+domCod t (NameTy _ ty) = domCod t ty
 domCod t ty = typeError t $ "Se esperaba un tipo función, pero se obtuvo: " ++ ppTy ty
 
 -- | 'tcDecl' chequea el tipo de una declaración
@@ -157,43 +157,43 @@ tcTy (V p var@(Free n)) bs _ = case lookup n bs of
 tcTy (V p var@(Global n)) bs _ = case lookup n bs of
   Nothing -> failPosFD4 p $ "Variable no declarada " ++ ppName n
   Just ty -> return (ty, TV var ty)
-tcTy (Const _ k@(CNat n)) _ _ = return (NatTy, TConst k NatTy)
-tcTy (Print p str t) bs ts = do
+tcTy (Const _ k@(CNat _)) _ _ = return (NatTy, TConst k NatTy)
+tcTy (Print _ str t) bs ts = do
   (ty, t') <- tcTy t bs ts
   expect NatTy ty t
   return (ty, TPrint str t' ty)
-tcTy (IfZ p c t t') bs ts = do
+tcTy (IfZ _ c t t') bs ts = do
   (tyc, ttmC) <- tcTy c bs ts
   expect NatTy tyc c
   (tyt, ttmT) <- tcTy t bs ts
   (tyt', ttmT') <- tcTy t' bs ts
   expect tyt tyt' t'
   return (tyt, TIfZ ttmC ttmT ttmT' tyt)
-tcTy (Lam p v ty t) bs ts = do
+tcTy (Lam _ v ty t) bs ts = do
   (ty', t') <- tcTy t bs (ty : ts) -- No abre terminos
   return (FunTy ty ty', TLam v ty t' (FunTy ty ty'))
-tcTy (App p t u) bs ts = do
+tcTy (App _ t u) bs ts = do
   (tyt, t') <- tcTy t bs ts
-  (dom, cod) <- domCod t tyt
+  (domm, codd) <- domCod t tyt
   (tyu, u') <- tcTy u bs ts
-  expect dom tyu u
-  return (cod, TApp t' u' dom cod)
+  expect domm tyu u
+  return (codd, TApp t' u' domm codd)
 tcTy (Fix p f fty x xty t) bs ts = do
-  (dom, cod) <- domCod (V p (Free f)) fty
-  when (dom /= xty) $ do
+  (domm, codd) <- domCod (V p (Free f)) fty
+  when (domm /= xty) $ do
     failPosFD4
       p
       "El tipo del argumento de un fixpoint debe coincidir con el \
       \dominio del tipo de la función"
   (ty', t') <- tcTy t bs (xty : fty : ts)
-  expect cod ty' t
+  expect codd ty' t
   return (fty, TFix f fty x xty t' fty)
-tcTy (Let p v ty def t) bs ts = do
+tcTy (Let _ v ty def t) bs ts = do
   (ty', t') <- tcTy def bs ts
   expect ty ty' def
   (ty'', t'') <- tcTy t bs (ty : ts)
   return $ (ty'', TLet v ty t' t'' ty'')
-tcTy (BinaryOp p op t u) bs ts = do
+tcTy (BinaryOp _ op t u) bs ts = do
   (tty, t') <- tcTy t bs ts
   expect NatTy tty t
   (uty, u') <- tcTy u bs ts

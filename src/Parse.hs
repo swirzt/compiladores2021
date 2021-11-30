@@ -11,9 +11,7 @@ import Common
 --( GenLanguageDef(..), emptyDef )
 
 import Control.Monad.Identity (Identity)
-import Data.Char (isNumber, ord)
 import Lang
-import System.IO --Para printear en test
 import Text.Parsec hiding (parse, runP)
 import Text.Parsec.Expr (Assoc, Operator)
 import qualified Text.Parsec.Expr as Ex
@@ -300,4 +298,4 @@ runP p s filename = runParser (whiteSpace *> p <* eof) () filename s
 parse :: String -> STerm
 parse s = case runP expr s "" of
   Right t -> t
-  Left e -> error ("no parse: " ++ show s)
+  Left _ -> error ("no parse: " ++ show s)
