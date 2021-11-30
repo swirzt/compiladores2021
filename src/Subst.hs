@@ -100,6 +100,7 @@ g2f x = x
 
 global2Free :: Term -> Term
 global2Free = fmap g2f
+
 ------Compilar a C
 varChangerTTerm ::
   (Int -> Ty -> Name -> TTerm) -> --que hacemos con las variables localmente libres
@@ -118,7 +119,7 @@ varChangerTTerm local bound t = go 0 t
     go n t@(TConst _ _) = t
     go n (TPrint str t ty) = TPrint str (go n t) ty
     go n (TBinaryOp op t u ty) = TBinaryOp op (go n t) (go n u) ty
-    go n (TLet v vty m o ty) = TLet  v vty (go n m) (go (n + 1) o) ty
+    go n (TLet v vty m o ty) = TLet v vty (go n m) (go (n + 1) o) ty
 
 openNTTerm :: [Name] -> TTerm -> TTerm
 openNTTerm ns = varChangerTTerm (\_ ty n -> TV (Free n) ty) bnd

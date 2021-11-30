@@ -19,16 +19,16 @@ desugar :: MonadFD4 m => STerm -> m NTerm
 desugar (SV info var) = return $ V info var
 desugar (SConst info const) = return $ Const info const
 desugar (SLam info [] _) = failPosFD4 info "No se dio un argumento a la función"
-desugar (SLam info (([],_): _) _) = failPosFD4 info "No se dio un argumento a la función"
+desugar (SLam info (([], _) : _) _) = failPosFD4 info "No se dio un argumento a la función"
 desugar (SLam info [([n], ty)] stm) = do
   stmDesugar <- desugar stm
   tyDesugar <- desugarTy ty
   return $ Lam info n tyDesugar stmDesugar
-desugar (SLam info [(n:ns,ty)] stm) = do
-  stmDesugar <- desugar (SLam info [(ns,ty)] stm)
+desugar (SLam info [(n : ns, ty)] stm) = do
+  stmDesugar <- desugar (SLam info [(ns, ty)] stm)
   tyDesugar <- desugarTy ty
   return $ Lam info n tyDesugar stmDesugar
-desugar (SLam info (b:bin) stm) = desugar (SLam info [b] $ SLam info bin stm)
+desugar (SLam info (b : bin) stm) = desugar (SLam info [b] $ SLam info bin stm)
 desugar (SApp info stm1 stm2) = do
   stm1Desugar <- desugar stm1
   stm2Desugar <- desugar stm2
@@ -42,18 +42,18 @@ desugar (SBinaryOp info b stm1 stm2) = do
   stm2Desugar <- desugar stm2
   return $ BinaryOp info b stm1Desugar stm2Desugar
 desugar (SFix info _ _ [] _) = failPosFD4 info "Falta el argumento del fix"
-desugar (SFix info _ _ (([],_): _) _) = failPosFD4 info "Falta el argumento del fix"
+desugar (SFix info _ _ (([], _) : _) _) = failPosFD4 info "Falta el argumento del fix"
 desugar (SFix info f fty [([n], sty)] stm) = do
   stmDesugar <- desugar stm
   ftyDesugar <- desugarTy fty
   tyDesugar <- desugarTy sty
   return $ Fix info f ftyDesugar n tyDesugar stmDesugar
-desugar (SFix info f fty [(n:ns, sty)] stm) = do
-  stmDesugar <- desugar (SLam info [(ns,sty)] stm)
+desugar (SFix info f fty [(n : ns, sty)] stm) = do
+  stmDesugar <- desugar (SLam info [(ns, sty)] stm)
   ftyDesugar <- desugarTy fty
   tyDesugar <- desugarTy sty
   return $ Fix info f ftyDesugar n tyDesugar stmDesugar
-desugar (SFix info f fty (b:bin) stm) = desugar (SFix info f fty [b] $ SLam info bin stm)
+desugar (SFix info f fty (b : bin) stm) = desugar (SFix info f fty [b] $ SLam info bin stm)
 desugar (SIfZ info stmb stmt stmf) = do
   stmb' <- desugar stmb
   stmt' <- desugar stmt
@@ -76,14 +76,14 @@ desugar (SLet info f [([n], sty)] lty stmt stmt' True) = do
   stmtDesugar' <- desugar stmt'
   fixTyDesugar <- desugarTy fixType
   return $ Let info f fixTyDesugar stmtDesugar stmtDesugar'
-desugar (SLet info f [(n:ns, sty)] lty stmt stmt' True) =
+desugar (SLet info f [(n : ns, sty)] lty stmt stmt' True) =
   let newTy = nConcatTy (length ns) sty lty
-      newTM = SLam info [(ns,sty)] stmt
-  in desugar $ SLet info f [([n],sty)] newTy newTM stmt' True
-desugar (SLet info f (b:bin) lty stmt stmt' True) = 
+      newTM = SLam info [(ns, sty)] stmt
+   in desugar $ SLet info f [([n], sty)] newTy newTM stmt' True
+desugar (SLet info f (b : bin) lty stmt stmt' True) =
   let newTM = SLam info bin stmt
       newTy = concatTy bin lty
-  in desugar $ SLet info f [b] newTy newTM stmt' True
+   in desugar $ SLet info f [b] newTy newTM stmt' True
 
 desugarTy :: MonadFD4 m => STy -> m Ty
 desugarTy SNatTy = return NatTy
@@ -99,7 +99,7 @@ desugarTy (SVarTy n) = do
 
 nConcatTy :: Int -> STy -> STy -> STy
 nConcatTy 1 t1 t2 = SFunTy t1 t2 -- No debería llegar a n = 0
-nConcatTy n t1 t2 = SFunTy t1 (nConcatTy (n-1) t1 t2)
+nConcatTy n t1 t2 = SFunTy t1 (nConcatTy (n - 1) t1 t2)
 
 concatTy :: [([a], STy)] -> STy -> STy
 concatTy [] t = t
@@ -139,28 +139,30 @@ elab' env (Let p v vty def body) = Let p v vty (elab' env def) (close v (elab' (
 
 desugarDecl :: MonadFD4 m => SDecl STerm -> m (Decl STerm)
 desugarDecl (SDeclFun pos name vars ty def False) = do
-  tyDesugar <- desugarConcatTy vars ty 
+  tyDesugar <- desugarConcatTy vars ty
   case vars of
     [] -> return $ DeclFun pos name tyDesugar def
-    _ -> return $ DeclFun pos name tyDesugar (SLam pos vars def) 
-desugarDecl (SDeclFun pos name vars ty def True) = do 
+    _ -> return $ DeclFun pos name tyDesugar (SLam pos vars def)
+desugarDecl (SDeclFun pos name vars ty def True) = do
   tyDesugar <- desugarConcatTy vars ty
   return $ DeclFun pos name tyDesugar (SFix pos name (concatTy vars ty) vars def)
 desugarDecl _ = failFD4 "Si llegué acá algo esta mal jej"
 
 -- Cantidad total de variables, considerando multibinders
-numVars :: [([Name],STy)] -> Int
-numVars xs = let xs' = map (\(ys,_) -> length ys) xs
-             in foldl (+) 0 xs'
+numVars :: [([Name], STy)] -> Int
+numVars xs =
+  let xs' = map (\(ys, _) -> length ys) xs
+   in foldl (+) 0 xs'
 
 resugarDecl :: MonadFD4 m => Decl STerm -> m (SDecl STerm)
 resugarDecl (DeclFun pos name ty def) = do
   sty <- resugarTy ty
   case def of
     SLam _ vars tt -> return $ SDeclFun pos name vars ((iterate codom sty) !! (numVars vars)) tt False
-    SFix _ fname fty vars tt -> if name == fname
-                                then return $ SDeclFun pos fname vars ((iterate codom sty) !! (numVars vars)) tt True
-                                else return $ SDeclFun pos name [] sty def False
+    SFix _ fname fty vars tt ->
+      if name == fname
+        then return $ SDeclFun pos fname vars ((iterate codom sty) !! (numVars vars)) tt True
+        else return $ SDeclFun pos name [] sty def False
     _ -> return $ SDeclFun pos name [] sty def False
 resugarDecl _ = failFD4 "Si llegué acá algo esta mal jej"
 
@@ -171,8 +173,10 @@ resugar (Lam info fv tv tm) = do
   stm <- resugar tm
   tvs <- resugarTy tv
   case stm of
-    SLam _ ((var, tyVarS):xs) tms -> if tyVarS == tvs then return $ SLam info ((fv:var, tyVarS):xs) tms
-                                                      else return $ SLam info (([fv],tvs):(var, tyVarS):xs) tms
+    SLam _ ((var, tyVarS) : xs) tms ->
+      if tyVarS == tvs
+        then return $ SLam info ((fv : var, tyVarS) : xs) tms
+        else return $ SLam info (([fv], tvs) : (var, tyVarS) : xs) tms
     SPrint _ str (SV _ fvp) ->
       if fv == fvp
         then return $ SPrintEta info str
@@ -192,8 +196,10 @@ resugar (Fix info nf tf nv tv tm) = do
   tfs <- resugarTy tf
   tvs <- resugarTy tv
   case stm of
-    SLam _ ((var, tyVarS):xs) tms -> if tyVarS == tvs then return $ SFix info nf tfs ((nv:var,tyVarS):xs) tms
-                                                      else return $ SFix info nf tfs (([nv],tyVarS):(var,tyVarS):xs) tms
+    SLam _ ((var, tyVarS) : xs) tms ->
+      if tyVarS == tvs
+        then return $ SFix info nf tfs ((nv : var, tyVarS) : xs) tms
+        else return $ SFix info nf tfs (([nv], tyVarS) : (var, tyVarS) : xs) tms
     _ -> return $ SFix info nf tfs [([nv], tvs)] stm
 resugar (Let info nv tv tt tm) = do
   stt <- resugar tt
@@ -202,8 +208,9 @@ resugar (Let info nv tv tt tm) = do
   case stt of
     SFix _ nf stf xs tms ->
       if nv == nf
-        then let typeF = (iterate codom stf) !! (numVars xs)
-             in return $ SLet info nf xs typeF tms stm True
+        then
+          let typeF = (iterate codom stf) !! (numVars xs)
+           in return $ SLet info nf xs typeF tms stm True
         else return $ SLet info nv [] stv stt stm False
     SLam _ xs tm2 -> do
       let typeF = (iterate codom stv) !! (numVars xs) --Para obtener el codominio n veces

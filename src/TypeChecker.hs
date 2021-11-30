@@ -160,23 +160,23 @@ tcTy (V p var@(Global n)) bs _ = case lookup n bs of
 tcTy (Const _ k@(CNat n)) _ _ = return (NatTy, TConst k NatTy)
 tcTy (Print p str t) bs ts = do
   (ty, t') <- tcTy t bs ts
-  expect NatTy ty t 
-  return (ty,TPrint str t' ty)
+  expect NatTy ty t
+  return (ty, TPrint str t' ty)
 tcTy (IfZ p c t t') bs ts = do
-  (tyc, ttmC)<- tcTy c bs ts
+  (tyc, ttmC) <- tcTy c bs ts
   expect NatTy tyc c
-  (tyt,ttmT)<- tcTy t bs ts
-  (tyt',ttmT') <- tcTy t' bs ts
-  expect tyt tyt' t' 
-  return (tyt, TIfZ ttmC ttmT ttmT' tyt) 
+  (tyt, ttmT) <- tcTy t bs ts
+  (tyt', ttmT') <- tcTy t' bs ts
+  expect tyt tyt' t'
+  return (tyt, TIfZ ttmC ttmT ttmT' tyt)
 tcTy (Lam p v ty t) bs ts = do
-  (ty',t') <- tcTy t bs (ty:ts) -- No abre terminos
+  (ty', t') <- tcTy t bs (ty : ts) -- No abre terminos
   return (FunTy ty ty', TLam v ty t' (FunTy ty ty'))
 tcTy (App p t u) bs ts = do
   (tyt, t') <- tcTy t bs ts
   (dom, cod) <- domCod t tyt
   (tyu, u') <- tcTy u bs ts
-  expect dom tyu u 
+  expect dom tyu u
   return (cod, TApp t' u' dom cod)
 tcTy (Fix p f fty x xty t) bs ts = do
   (dom, cod) <- domCod (V p (Free f)) fty
@@ -185,13 +185,13 @@ tcTy (Fix p f fty x xty t) bs ts = do
       p
       "El tipo del argumento de un fixpoint debe coincidir con el \
       \dominio del tipo de la función"
-  (ty',t') <- tcTy t bs (xty:fty:ts)
+  (ty', t') <- tcTy t bs (xty : fty : ts)
   expect cod ty' t
   return (fty, TFix f fty x xty t' fty)
 tcTy (Let p v ty def t) bs ts = do
   (ty', t') <- tcTy def bs ts
   expect ty ty' def
-  (ty'', t'') <- tcTy t bs (ty:ts)
+  (ty'', t'') <- tcTy t bs (ty : ts)
   return $ (ty'', TLet v ty t' t'' ty'')
 tcTy (BinaryOp p op t u) bs ts = do
   (tty, t') <- tcTy t bs ts
@@ -207,10 +207,9 @@ changeTy (TLam n ty tm _) t = TLam n ty tm t
 changeTy (TApp tm1 tm2 ty _) t = TApp tm1 tm2 ty t
 changeTy (TPrint str tm _) t = TPrint str tm t
 changeTy (TBinaryOp bop tm1 tm2 _) t = TBinaryOp bop tm1 tm2 t
-changeTy (TFix f fTy var varTy tm _) t = TFix f fTy var varTy tm t 
+changeTy (TFix f fTy var varTy tm _) t = TFix f fTy var varTy tm t
 changeTy (TIfZ tmb tmt tmf _) t = TIfZ tmb tmt tmf t
-changeTy (TLet name ty tm tm' _) t = TLet name ty tm tm' t 
-
+changeTy (TLet name ty tm tm' _) t = TLet name ty tm tm' t
 
 tcDeclTy :: MonadFD4 m => Decl Term -> m (Decl TTerm)
 tcDeclTy (DeclFun p n t def) = do
@@ -220,10 +219,10 @@ tcDeclTy (DeclFun p n t def) = do
     Nothing -> do
       --no está declarado
       s <- get
-      (ty,def') <- tcTy def (tyEnv s) []
+      (ty, def') <- tcTy def (tyEnv s) []
       expect t ty def -- Agregado por nosotros, espera el type de la decl
       addTy n ty
       let deff = changeTy def' t
-      return $ DeclFun p n t deff 
+      return $ DeclFun p n t deff
     Just _ -> failPosFD4 p $ n ++ " ya está declarado"
 tcDeclTy _ = undefined

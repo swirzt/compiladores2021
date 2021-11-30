@@ -162,11 +162,11 @@ freeVars tm = nubSort $ go tm []
     go (Const _ _) xs = xs
     go (Let _ _ _ e t) xs = go e (go t xs)
 
-freeVarsTTerm :: TTerm -> [(Name,Ty)]
-freeVarsTTerm tm = nubSort $ go tm [] 
+freeVarsTTerm :: TTerm -> [(Name, Ty)]
+freeVarsTTerm tm = nubSort $ go tm []
   where
-    go (TV (Free v) ty) xs = (v,ty) : xs
-    go (TV (Global v) ty) xs = (v,ty) : xs
+    go (TV (Free v) ty) xs = (v, ty) : xs
+    go (TV (Global v) ty) xs = (v, ty) : xs
     go (TV _ _) xs = xs
     go (TLam _ _ t _) xs = go t xs
     go (TApp l r _ _) xs = go l $ go r xs

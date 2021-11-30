@@ -1,12 +1,12 @@
 module C (ir2C) where
 
+import Data.Maybe
 import Data.Text (unpack)
 import Data.Text.Prettyprint.Doc
 import Data.Text.Prettyprint.Doc.Render.Terminal (renderStrict)
+import Debug.Trace
 import IR
 import Lang
-import Debug.Trace
-import Data.Maybe
 
 ty2Doc :: Ty -> Doc a
 ty2Doc NatTy = pretty "nat"
@@ -15,21 +15,21 @@ ty2Doc (FunTy d c) = pretty "clos"
 
 args2Doc :: [(Name, Maybe Ty)] -> [Doc a]
 args2Doc [] = []
-args2Doc ((n,Nothing):xs) = (pretty "clos" <+> name n) : args2Doc xs
-args2Doc ((n,Just ty):xs) = (ty2Doc ty <+> name n) : args2Doc xs
+args2Doc ((n, Nothing) : xs) = (pretty "clos" <+> name n) : args2Doc xs
+args2Doc ((n, Just ty) : xs) = (ty2Doc ty <+> name n) : args2Doc xs
 
 argsTy2Doc :: [(b, Maybe Ty)] -> [Doc a]
 argsTy2Doc [] = []
-argsTy2Doc ((_,Nothing):xs) = (pretty "clos") : argsTy2Doc xs
-argsTy2Doc ((_,Just ty):xs) = (ty2Doc ty) : argsTy2Doc xs
+argsTy2Doc ((_, Nothing) : xs) = (pretty "clos") : argsTy2Doc xs
+argsTy2Doc ((_, Just ty) : xs) = (ty2Doc ty) : argsTy2Doc xs
 
 decl2doc :: IrDecl -> Doc a
 decl2doc (IrVal n t ty) = ty2Doc ty <+> name n <> semi
 decl2doc (IrFun n args t ty) =
-  let tyReturn = ty2Doc (tcodom ty) in
-   tyReturn <+> name n <+> tupled (args2Doc args)
-    <+> braces (nest 2 (line <> pretty "return" <+> ir2doc t <> semi) <> line)
-decl2doc (IrType n ty) = pretty "#define" <+> name n <+> ty2Doc ty  
+  let tyReturn = ty2Doc (tcodom ty)
+   in tyReturn <+> name n <+> tupled (args2Doc args)
+        <+> braces (nest 2 (line <> pretty "return" <+> ir2doc t <> semi) <> line)
+decl2doc (IrType n ty) = pretty "#define" <+> name n <+> ty2Doc ty
 
 fd4Main :: [IrDecl] -> Doc a
 fd4Main xs =
@@ -39,7 +39,7 @@ fd4Main xs =
     vals2doc :: [IrDecl] -> [Doc a]
     vals2doc [] = []
     vals2doc [IrVal n t ty] = [name n <+> pretty "=" <+> ir2doc t <> semi, irPrintN (name n), semi]
-    vals2doc (IrVal n t ty : ds) = (name n <+> pretty "=" <+>  ir2doc t <> semi) : vals2doc ds
+    vals2doc (IrVal n t ty : ds) = (name n <+> pretty "=" <+> ir2doc t <> semi) : vals2doc ds
     vals2doc (_ : ds) = vals2doc ds
 
 name :: String -> Doc a
@@ -54,7 +54,7 @@ stmts xs =
 ir2doc :: Ir -> Doc a
 ir2doc (IrVar n) = name n
 ir2doc (IrGlobal n) = name n
-ir2doc (IrCall f args dom codom) = parens (parens (ty2Doc codom <+> pretty "(*)" <+> tupled (argsTy2Doc args)) <+> ir2doc f) <> tupled (map (\(ir,_) -> ir2doc ir) args)
+ir2doc (IrCall f args dom codom) = parens (parens (ty2Doc codom <+> pretty "(*)" <+> tupled (argsTy2Doc args)) <+> ir2doc f) <> tupled (map (\(ir, _) -> ir2doc ir) args)
 ir2doc (IrConst (CNat n)) = pretty n
 ir2doc (IrBinaryOp Add a b) = ir2doc a <+> pretty "+" <+> ir2doc b
 ir2doc (IrBinaryOp Sub a b) = pretty "fd4_sub" <> tupled [ir2doc a, ir2doc b]

@@ -144,11 +144,13 @@ atom =
     <|> printParse
 
 multivar :: P [Name]
-multivar = (do
-  v <- var
-  vs <- multivar
-  return (v : vs))
-  <|> return []
+multivar =
+  ( do
+      v <- var
+      vs <- multivar
+      return (v : vs)
+  )
+    <|> return []
 
 -- parsea un par (variable : tipo)
 binding :: P ([Name], STy)

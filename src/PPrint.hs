@@ -302,7 +302,7 @@ binding2doc (x, ty) =
 sname2doc :: [Name] -> Doc AnsiStyle
 sname2doc [] = mempty
 sname2doc [x] = name2doc x
-sname2doc (x:xs) = name2doc x <+> sname2doc xs
+sname2doc (x : xs) = name2doc x <+> sname2doc xs
 
 sbinding2doc :: [([Name], STy)] -> Doc AnsiStyle
 sbinding2doc [] = mempty

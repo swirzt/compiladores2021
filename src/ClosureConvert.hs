@@ -16,10 +16,10 @@ generateName n = do
   modify (\(h, vars) -> (h + 1, vars))
   return $ n ++ show k
 
-makeLet :: Ir -> Name -> [(Name,Ty)] -> Bool -> Ty -> Ir
-makeLet tm name xs False t = foldr (\((x,ty), y) r -> IrLet x (IrAccess (IrVar name) y) r ty t) tm (zip xs [1 ..])
+makeLet :: Ir -> Name -> [(Name, Ty)] -> Bool -> Ty -> Ir
+makeLet tm name xs False t = foldr (\((x, ty), y) r -> IrLet x (IrAccess (IrVar name) y) r ty t) tm (zip xs [1 ..])
 makeLet tm _ [] True _ = tm
-makeLet tm name ((x,ty) : xs) True t = IrLet x (IrVar name) (makeLet tm name xs False t) ty t
+makeLet tm name ((x, ty) : xs) True t = IrLet x (IrVar name) (makeLet tm name xs False t) ty t
 
 closureConvert :: TTerm -> StateT (Int, [(Name, Ty)]) (Writer [IrDecl]) Ir
 closureConvert (TV var ty) = case var of
@@ -44,7 +44,7 @@ closureConvert (TApp tm1 tm2 tyDom tyCod) = do
   itm2 <- closureConvert tm2
   fname <- generateName "t"
   let newdef = IrVar fname
-  return $ IrLet fname itm1 (IrCall (IrAccess newdef 0) [(newdef,Nothing), (itm2, Just tyDom)] tyDom tyCod)  (FunTy tyDom tyCod) tyCod
+  return $ IrLet fname itm1 (IrCall (IrAccess newdef 0) [(newdef, Nothing), (itm2, Just tyDom)] tyDom tyCod) (FunTy tyDom tyCod) tyCod
 closureConvert (TPrint str tm ty) = do
   itm <- closureConvert tm
   pname <- generateName "p"
@@ -64,10 +64,10 @@ closureConvert (TFix fn tf vn tv tm ty) = do
   fname <- generateName fn
   frname <- generateName "fr"
   let ttm = openNTTerm [frname, vname] tm
-  modify (\(k, vars) -> (k, (vname,tv) : (frname,tf) : vars))
+  modify (\(k, vars) -> (k, (vname, tv) : (frname, tf) : vars))
   itm <- closureConvert ttm
   let cname = "closure" ++ fname
-  let itm' = makeLet itm cname ((frname,tf) :fvars) True ty
+  let itm' = makeLet itm cname ((frname, tf) : fvars) True ty
   tell [IrFun fname [(cname, Nothing), (vname, Just tv)] itm' ty]
   let (names, _) = unzip fvars
   return $ MkClosure fname (fmap IrVar names) ty
@@ -82,8 +82,9 @@ closureConvert (TLet name tyDom tn tm tyCod) = do
 runCC :: Int -> [Decl TTerm] -> [IrDecl]
 runCC _ [] = []
 runCC n (decl : xs) = case decl of
-  DeclType _ name ty -> let y = runCC n xs
-                        in (IrType name ty) : y
+  DeclType _ name ty ->
+    let y = runCC n xs
+     in (IrType name ty) : y
   DeclFun _ name ty tt ->
     let freevars = freeVarsTTerm tt
         ((ir, (k, _)), xx) = runWriter $ runStateT (closureConvert tt) (n, freevars)

@@ -134,13 +134,14 @@ printFD4Char :: MonadFD4 m => Char -> m ()
 printFD4Char = liftIO . putChar
 
 getOptimiz :: MonadFD4 m => m Bool
-getOptimiz = do s <- get
-                return $ optimiz s
+getOptimiz = do
+  s <- get
+  return $ optimiz s
 
-resetOptimiz :: MonadFD4 m =>  m ()
+resetOptimiz :: MonadFD4 m => m ()
 resetOptimiz = modify (\s -> s {optimiz = False})
 
-modifyOptimiz :: MonadFD4 m =>  m ()
+modifyOptimiz :: MonadFD4 m => m ()
 modifyOptimiz = modify (\s -> s {optimiz = True})
 
 ----
