@@ -91,7 +91,7 @@ main = execParser opts >>= go
     go (Typecheck, opt, files) =
               runOrFail $ mapM_ (typecheckFile opt) files
     go (InteractiveCEK, opt, files) = runFD4 (runInputT defaultSettings (repl files InteractiveCEK opt)) >>
-                 return () --Consultar si esto esta bien
+                 return ()
     go (Bytecompile, opt, files) =
               runOrFail $ mapM_ (bytecompileFile opt) files
     go (RunVM, _, files) =
@@ -190,13 +190,10 @@ typecheckDecl _ (SDeclType i n v) = do tyDesugar <- desugarTy v
 
 handleDecl ::  MonadFD4 m => Bool -> SDecl STerm -> m ()
 handleDecl opt d = do
-        output <- typecheckDecl False d -- Llama a typecheck con optimizaciones apagadas para no optimizar 2 veces
+        output <- typecheckDecl opt d
         case output of
           DeclFun p n ty tt -> do te <- eval tt
-                                  printFD4Debug te
-                                  tt' <- optimize (if opt then optIter else 0) te
-                                  printFD4Debug tt'
-                                  addDecl (DeclFun p n ty tt')
+                                  addDecl (DeclFun p n ty te)
           _ -> return ()
 
 data Command = Compile CompileForm

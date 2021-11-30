@@ -108,9 +108,6 @@ concatTy ((ys, sty) : xs) t = nConcatTy (length ys) sty (concatTy xs t)
 desugarConcatTy :: MonadFD4 m => [([a], STy)] -> STy -> m Ty
 desugarConcatTy xs a = desugarTy $ concatTy xs a
 
--- desugar ( Si la primer lista de Let es vacio es sin sugar
--- desugar (SType info Name STy
-
 -- 'elab' transforma variables ligadas en índices de de Bruijn
 -- en un término dado.
 elab :: MonadFD4 m => STerm -> m Term
@@ -229,44 +226,3 @@ resugarTy (FunTy x y) = do
   yy <- resugarTy y
   return (SFunTy xx yy)
 resugarTy (NameTy n _) = return $ SVarTy n
-
--- getTy :: TTerm -> Ty
--- getTy (TV _ t) = t
--- getTy (TConst _ t) = t
--- getTy (TLam _ _ _ t) = t
--- getTy (TApp _ _ t) = t
--- getTy (TPrint _ _ t) = t
--- getTy (TBinaryOp _ _ _ t) = t
--- getTy (TFix _ _ _ _ _ t) = t
--- getTy (TIfZ _ _ _ t) = t
--- getTy (TLet _ _ _ _ t) = t
-
--- --Consulta para Mauro: ¿En que orden se guardan los tipos en el entorno? ¿Nos complican los indices de deBroin?
--- typer :: MonadFD4 m => Term -> [Ty] -> m TTerm
--- typer (V i var) xs = case var of
---                         Bound k -> return $ TV var (xs !! k)
---                         Global n -> do t <- lookupTy n
---                                        case t of
---                                          Just ty -> return $ TV var ty
---                                          Nothing -> failFD4 "error de tipo" -- No debería
---                         Free n -> failFD4 "No esperabamos variables libres"
--- typer (Const i k) xs = return $ TConst k NatTy
--- typer (Lam i name ty tm) xs = do tm' <- typer tm (ty:xs)
---                                  return $ TLam name ty tm' (getTy tm')
--- typer (App i tm1 tm2) xs = do tm1' <- typer tm1 xs
---                               tm2' <- typer tm2 xs
---                               return $ TApp tm1' tm2' (tcodom $ getTy tm1') --Meter el tipo de tm1'
--- typer (Print i str tm) xs = do tm' <- typer tm xs
---                                return $ TPrint str tm' (getTy tm')
--- typer (BinaryOp i bOp tm1 tm2) xs = do tm1' <- typer tm1 xs
---                                        tm2' <- typer tm2 xs
---                                        return $ TBinaryOp bOp tm1' tm2' NatTy
--- typer (Fix i fName fTy vName vTy tm) xs = do tm' <- typer tm (vTy:fTy:xs)
---                                              return $ TFix fName fTy vName vTy tm' fTy
--- typer (IfZ i tmb tmt tmf) xs = do tmb' <- typer tmb xs
---                                   tmt' <- typer tmt xs
---                                   tmf' <- typer tmf xs
---                                   return $ TIfZ tmb' tmt' tmf' (getTy tmt')
--- typer (Let i vName vTy tm1 tm2) xs = do tm1' <- typer tm1 xs
---                                         tm2' <- typer tm2 (vTy:xs)
---                                         return $ TLet vName vTy tm1' tm2' (getTy tm2')

@@ -101,18 +101,6 @@ data STm info var
   -- Si la primer lista de Let es vacio es sin sugar
   deriving (Show, Functor)
 
-type STerm =
-  -- | 'STm' tiene 'Name's como variables ligadas y libres y globales, guarda posición, y azucar sintactico
-  STm Pos Name
-
-type NTerm =
-  -- | 'Tm' tiene 'Name's como variables ligadas y libres y globales, guarda posición
-  Tm Pos Name
-
-type Term =
-  -- | 'Tm' con índices de De Bruijn como variables ligadas, y nombres para libres y globales, guarda posición`
-  Tm Pos Var
-
 data TTm var
   = TV var Ty
   | TConst Const Ty
@@ -124,6 +112,18 @@ data TTm var
   | TIfZ (TTm var) (TTm var) (TTm var) Ty
   | TLet Name Ty (TTm var) (TTm var) Ty
   deriving (Show, Functor)
+
+type STerm =
+  -- | 'STm' tiene 'Name's como variables ligadas y libres y globales, guarda posición, y azucar sintactico
+  STm Pos Name
+
+type NTerm =
+  -- | 'Tm' tiene 'Name's como variables ligadas y libres y globales, guarda posición
+  Tm Pos Name
+
+type Term =
+  -- | 'Tm' con índices de De Bruijn como variables ligadas, y nombres para libres y globales, guarda posición
+  Tm Pos Var
 
 type TTerm =
   TTm Var

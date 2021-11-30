@@ -163,49 +163,17 @@ type Module = [Decl Term]
 bytecompileModule :: MonadFD4 m => Module -> m Bytecode
 bytecompileModule xs = do
   tm <- declToLet xs
-  tm' <- closeLet tm
-  ys <- bc tm'
+  ys <- bc tm
   return $ ys ++ [PRINTN, STOP]
 
+-- Esto es un fold?
 declToLet :: MonadFD4 m => Module -> m Term
-declToLet [DeclFun pos name ty body] = do
-  let bodyf = global2Free body
-  return $ Let pos name ty bodyf (V pos (Bound 0))
+declToLet [DeclFun pos name ty body] = return $ global2Free body
 declToLet (DeclFun pos name ty body : xs) = do
   tm <- declToLet xs
   let bodyf = global2Free body
-  return $ Let pos name ty bodyf tm
+  return $ Let pos name ty bodyf (close name tm)
 declToLet _ = undefined -- Para calmar al linter
-
-closeLet :: MonadFD4 m => Term -> m Term
-closeLet a@(V _ _) = return a
-closeLet c@(Const _ _) = return c
-closeLet (Lam info name ty tm) = do
-  tm' <- closeLet tm
-  return $ Lam info name ty tm'
-closeLet (App info tm1 tm2) = do
-  tm1' <- closeLet tm1
-  tm2' <- closeLet tm2
-  return $ App info tm1' tm2'
-closeLet (Print info string tm) = do
-  tm' <- closeLet tm
-  return $ Print info string tm'
-closeLet (BinaryOp info op tm1 tm2) = do
-  tm1' <- closeLet tm1
-  tm2' <- closeLet tm2
-  return $ BinaryOp info op tm1' tm2'
-closeLet (Fix info name1 ty1 name2 ty2 tm) = do
-  tm' <- closeLet tm
-  return $ Fix info name1 ty1 name2 ty2 tm'
-closeLet (IfZ info tm tt tf) = do
-  tm' <- closeLet tm
-  tt' <- closeLet tt
-  tf' <- closeLet tf
-  return $ IfZ info tm' tt' tf'
-closeLet (Let info name ty body tm) = do
-  tm' <- closeLet tm
-  body' <- closeLet body
-  return $ Let info name ty body' (close name tm')
 
 -- | Toma un bytecode, lo codifica y lo escribe un archivo
 bcWrite :: Bytecode -> FilePath -> IO ()
@@ -229,9 +197,8 @@ runBC' (CONST : n : c) e s = runBC' c e (I n : s)
 runBC' (ADD : c) e (I n : I m : s) = runBC' c e (I (m + n) : s)
 runBC' (ADD : _) _ _ = failFD4 "Error al ejecutar ADD"
 runBC' (SUB : c) e (I n : I m : s) =
-  if m > n
-    then runBC' c e (I (m - n) : s)
-    else runBC' c e (I 0 : s)
+  let k = max 0 (m - n)
+   in runBC' c e (I k : s)
 runBC' (SUB : _) _ _ = failFD4 "Error al ejecutar SUB"
 runBC' (ACCESS : i : c) e s = runBC' c e (e !! i : s)
 runBC' (CALL : c) e (v : Fun ef cf : s) = runBC' cf (v : ef) (RA e c : s)
