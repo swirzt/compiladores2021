@@ -2,4 +2,4 @@ let uno : Nat = 1
 type Pedro = Nat
 type MAt = Pedro
 let multi : MAt -> Pedro = fun (k : MAt) -> 0 - k
-let z : Pedro = let f (x : Nat) : Nat = x + 1 in multi (f(f uno))
+let z : Pedro = let f (x : Nat) : Nat = x + 1 in multi uno

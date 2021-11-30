@@ -1,3 +1,5 @@
+{-# LANGUAGE PatternSynonyms #-}
+
 module Optimizations where
 
 import Eval
@@ -7,25 +9,18 @@ import PPrint
 import Subst
 
 -- Constant Folding and Propagation
+cambiado :: MonadFD4 m => Term -> m Term
+cambiado t = modifyOptimiz >> return t
+
+pattern CONST n <- Const _ (CNat n)
+
 constantOpt :: MonadFD4 m => Term -> m Term
-constantOpt (BinaryOp info bOp (Const _ (CNat c1)) (Const _ (CNat c2))) = do
-  modifyOptimiz
-  return $ Const info $ CNat $ semOp bOp c1 c2
-constantOpt (BinaryOp _ _ term (Const _ (CNat 0))) = do
-  modifyOptimiz
-  constantOpt term
-constantOpt (BinaryOp _ Add (Const _ (CNat 0)) term) = do
-  modifyOptimiz
-  constantOpt term
-constantOpt (IfZ _ (Const _ (CNat 0)) term _) = do
-  modifyOptimiz
-  constantOpt term
-constantOpt (IfZ _ (Const _ (CNat _)) _ term) = do
-  modifyOptimiz
-  constantOpt term
-constantOpt (Let _ _ _ c@(Const _ _) tm) = do
-  modifyOptimiz
-  constantOpt $ subst c tm
+constantOpt (BinaryOp info bOp (CONST c1) (CONST c2)) = cambiado $ Const info $ CNat $ semOp bOp c1 c2
+constantOpt (BinaryOp _ _ term (CONST 0)) = cambiado term
+constantOpt (BinaryOp _ Add (CONST 0) term) = cambiado term
+constantOpt (IfZ _ (CONST 0) term _) = cambiado term
+constantOpt (IfZ _ (CONST _) _ term) = cambiado term
+constantOpt (Let _ _ _ c@(CONST _) tm) = cambiado $ subst c tm
 constantOpt t = return t
 
 inlineAndDead :: MonadFD4 m => Term -> m Term
@@ -36,25 +31,15 @@ inlineAndDead t@(Let info name ty tm1 tm2) = do
   where
     temporal calls size
       | calls == 0 = do
-        modifyOptimiz
         stm <- spp t
         printFD4 $ "Cuidado: Variable sin usar " ++ name ++ " en el término:\n " ++ stm ++ "\n En línea: " ++ show info
-        inlineAndDead tm2
-      | calls == 1 = do
-        modifyOptimiz
-        inlineAndDead $ subst tm1 tm2
-      | calls > 10 = do
-        modifyOptimiz
-        inlineAndDead $ subst tm1 tm2
+        cambiado tm2
+      | calls == 1 = cambiado $ subst tm1 tm2
+      | calls > 10 = cambiado $ subst tm1 tm2
       | otherwise =
         if size < 10
-          then do
-            modifyOptimiz
-            inlineAndDead $ subst tm1 tm2
-          else do
-            tm1' <- inlineAndDead tm1
-            tm2' <- inlineAndDead tm2
-            return $ Let info name ty tm1' tm2'
+          then cambiado $ subst tm1 tm2
+          else return t
 inlineAndDead t = return t
 
 numCall :: Term -> Int
@@ -82,10 +67,14 @@ termSize (Print _ _ tm) = 1 + termSize tm
 termSize (BinaryOp _ _ tm1 tm2) = 1 + max (termSize tm1) (termSize tm2)
 termSize (Fix _ _ _ _ _ tm) = 1 + termSize tm
 termSize (IfZ _ tb tt tf) = 1 + maximum [(termSize tb), (termSize tt), (termSize tf)]
-termSize (Let _ _ _ tm1 _) = 1 + termSize tm1 -- Queremos el tamano del argumento
+termSize (Let _ _ _ tm1 _) = 1 + termSize tm1 -- Queremos el tamaño del argumento
 
 optimizer :: MonadFD4 m => Term -> m Term
-optimizer t = constantOpt t >>= inlineAndDead >>= visitor
+optimizer t =
+  return t
+    >>= constantOpt
+    >>= inlineAndDead
+    >>= visitor
 
 visitor :: MonadFD4 m => Term -> m Term
 visitor t@(V _ _) = return t
