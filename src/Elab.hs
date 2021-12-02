@@ -10,7 +10,6 @@
 -- fully named (@NTerm) a locally closed (@Term@)
 module Elab (elab, desugarDecl, desugarTy, resugarTy, resugar, resugarDecl) where
 
-import Data.Text.Internal.Lazy.Encoding.Fusion (streamUtf32BE)
 import Lang
 import MonadFD4
 import Subst

@@ -9,11 +9,11 @@ import PPrint
 import Subst
 
 -- Constant Folding and Propagation
-
+pattern CONST :: Int -> Tm info var
 pattern CONST n <- Const _ (CNat n)
 
 changeContstant :: MonadFD4 m => Term -> m Term
-changeContstant t = modifyOptimiz >> constantOpt t
+changeContstant t = modifyOptimized >> constantOpt t
 
 constantOpt :: MonadFD4 m => Term -> m Term
 constantOpt (BinaryOp info bOp (CONST c1) (CONST c2)) = changeContstant $ Const info $ CNat $ semOp bOp c1 c2
@@ -25,10 +25,10 @@ constantOpt (Let _ _ _ c@(CONST _) tm) = changeContstant $ subst c tm
 constantOpt t = return t
 
 changeInline :: MonadFD4 m => Term -> m Term
-changeInline t = modifyOptimiz >> inlineAndDead t
+changeInline t = modifyOptimized >> inlineAndDead t
 
 inlineAndDead :: MonadFD4 m => Term -> m Term
-inlineAndDead t@(Let info name ty tm1 tm2) = do
+inlineAndDead t@(Let info name _ tm1 tm2) = do
   let calls = numCall tm2
   let size = termSize tm1
   temporal calls size
@@ -53,7 +53,7 @@ numCall' :: Int -> Term -> Int
 numCall' i (V _ v) = case v of
   Bound n -> if i == n then 1 else 0
   _ -> 0
-numCall' i (Const _ _) = 0
+numCall' _ (Const _ _) = 0
 numCall' i (Lam _ _ _ tm) = numCall' (i + 1) tm
 numCall' i (App _ tm1 tm2) = numCall' i tm1 + numCall' i tm2
 numCall' i (Print _ _ tm) = numCall' i tm

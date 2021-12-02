@@ -87,7 +87,7 @@ runCC n (decl : xs) = case decl of
     let y = runCC n xs
      in (IrType name ty) : y
   DeclFun _ name ty tt ->
-    let freevars = freeVarsTy tt
+    let freevars = freeVarsInfo tt
         ((ir, (k, _)), xx) = runWriter $ runStateT (closureConvert tt) (n, freevars)
         y = runCC k xs
      in (IrVal name ir ty) : xx ++ y

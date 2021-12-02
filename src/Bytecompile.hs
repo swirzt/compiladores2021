@@ -23,7 +23,7 @@ import Subst
 
 type Opcode = Int
 
-type Bytecode = [Int]
+type Bytecode = [Opcode]
 
 newtype Bytecode32 = BC {un32 :: [Word32]}
 
@@ -168,7 +168,7 @@ bytecompileModule xs = do
 
 -- Esto es un fold?
 declToLet :: MonadFD4 m => Module -> m Term
-declToLet [DeclFun pos name ty body] = return $ global2Free body
+declToLet [DeclFun _ _ _ body] = return $ global2Free body
 declToLet (DeclFun pos name ty body : xs) = do
   tm <- declToLet xs
   let bodyf = global2Free body

@@ -50,7 +50,11 @@ data BinaryOp = Add | Sub
 
 -- | tipo de datos de declaraciones, parametrizado por el tipo del cuerpo de la declaración
 data Decl a
-  = DeclType Pos Name Ty
+  = DeclType
+      { declPos :: Pos,
+        declName :: Name,
+        declType :: Ty
+      }
   | DeclFun
       { declPos :: Pos,
         declName :: Name,
@@ -150,8 +154,8 @@ freeVars tm = nubSort $ go tm []
     go (Const _ _) xs = xs
     go (Let _ _ _ e t) xs = go e (go t xs)
 
-freeVarsTy :: Ord info => Tm info Var -> [(Name, info)]
-freeVarsTy tm = nubSort $ go tm []
+freeVarsInfo :: Ord info => Tm info Var -> [(Name, info)]
+freeVarsInfo tm = nubSort $ go tm []
   where
     go (V ty (Free v)) xs = (v, ty) : xs
     go (V ty (Global v)) xs = (v, ty) : xs
