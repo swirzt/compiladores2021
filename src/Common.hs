@@ -20,6 +20,9 @@ data Pos
   | -- | Posición en un archivo.
     Pos !Line !Column
 
+instance Eq Pos where
+  x == y = True
+
 instance Semigroup Pos where
   i <> NoPos = i
   _ <> i = i

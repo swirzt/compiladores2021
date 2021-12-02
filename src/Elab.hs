@@ -151,14 +151,25 @@ numVars xs =
   let xs' = map (\(ys, _) -> length ys) xs
    in foldl (+) 0 xs'
 
+getCodom :: Ty -> Ty
+getCodom a@(FunTy _ _) = tcodom a
+getCodom a@(NameTy _ t) = getCodom t
+getCodom _ = undefined
+
 resugarDecl :: MonadFD4 m => Decl STerm -> m (SDecl STerm)
 resugarDecl (DeclFun pos name ty def) = do
   sty <- resugarTy ty
   case def of
-    SLam _ vars tt -> return $ SDeclFun pos name vars ((iterate codom sty) !! (numVars vars)) tt False
+    SLam _ vars tt -> do
+      let typeF = (iterate getCodom ty) !! (numVars vars)
+      typeFR <- resugarTy typeF
+      return $ SDeclFun pos name vars typeFR tt False
     SFix _ fname _ vars tt ->
       if name == fname
-        then return $ SDeclFun pos fname vars ((iterate codom sty) !! (numVars vars)) tt True
+        then do
+          let typeF = (iterate getCodom ty) !! (numVars vars)
+          typeFR <- resugarTy typeF
+          return $ SDeclFun pos fname vars typeFR tt True
         else return $ SDeclFun pos name [] sty def False
     _ -> return $ SDeclFun pos name [] sty def False
 resugarDecl _ = failFD4 "Si llegué acá algo esta mal jej"
@@ -205,13 +216,15 @@ resugar (Let info nv tv tt tm) = do
   case stt of
     SFix _ nf stf xs tms ->
       if nv == nf
-        then
-          let typeF = (iterate codom stf) !! (numVars xs)
-           in return $ SLet info nf xs typeF tms stm True
+        then do
+          let typeF = (iterate getCodom tv) !! (numVars xs)
+          typeFR <- resugarTy typeF
+          return $ SLet info nf xs typeFR tms stm True
         else return $ SLet info nv [] stv stt stm False
     SLam _ xs tm2 -> do
-      let typeF = (iterate codom stv) !! (numVars xs) --Para obtener el codominio n veces
-      return $ SLet info nv xs typeF tm2 stm False
+      let typeF = (iterate getCodom tv) !! (numVars xs) --Para obtener el codominio n veces
+      typeFR <- resugarTy typeF
+      return $ SLet info nv xs typeFR tm2 stm False
     _ -> return $ SLet info nv [] stv stt stm False
 resugar (IfZ info tmb tmt tmf) = do
   stmb' <- resugar tmb

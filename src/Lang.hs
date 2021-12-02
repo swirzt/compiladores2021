@@ -43,10 +43,10 @@ data STy
 type Name = String
 
 newtype Const = CNat Int
-  deriving (Show)
+  deriving (Show, Eq)
 
 data BinaryOp = Add | Sub
-  deriving (Show)
+  deriving (Show, Eq)
 
 -- | tipo de datos de declaraciones, parametrizado por el tipo del cuerpo de la declaración
 data Decl a
@@ -89,7 +89,7 @@ data Tm info var
   | Fix info Name Ty Name Ty (Tm info var)
   | IfZ info (Tm info var) (Tm info var) (Tm info var)
   | Let info Name Ty (Tm info var) (Tm info var)
-  deriving (Show, Functor)
+  deriving (Show, Functor, Eq)
 
 data STm info var
   = SV info var
@@ -124,7 +124,7 @@ data Var
   = Bound !Int
   | Free Name
   | Global Name
-  deriving (Show)
+  deriving (Show, Eq)
 
 -- | Obtiene la info en la raíz del término.
 getInfo :: Tm info var -> info

@@ -39,9 +39,11 @@ data GlEnv = GlEnv
     -- | Si se quiere optimizar los términos
     opti :: Bool,
     -- | Si se optimizó el término en la última pasada
-    optimized :: Bool
+    optimized :: Bool,
+    -- | Generador de nombres frescos
+    fresh :: Int
   }
 
 -- | Valor del estado inicial
 initialEnv :: GlEnv
-initialEnv = GlEnv True "" 0 [] [] [] Nothing False False
+initialEnv = GlEnv True "" 0 [] [] [] Nothing False False 0

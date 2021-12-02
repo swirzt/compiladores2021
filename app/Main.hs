@@ -147,11 +147,23 @@ compileFile f = do
   decls <- parseIO filename program x
   mapM_ handleDecl decls
 
+fmapM :: MonadFD4 m => (Term -> m Term) -> Decl Term -> m (Decl Term)
+fmapM _ d@(DeclType _ _ _) = return d
+fmapM f (DeclFun i n t term) = do
+  term' <- f term
+  return $ DeclFun i n t term'
+
 typecheckFile :: MonadFD4 m => FilePath -> m ()
 typecheckFile f = do
   printFD4 ("Chequeando " ++ f)
   decls <- loadFile f
-  ppterms <- mapM (typecheckDecl >=> sppDecl) decls
+  ldecls <- mapM typecheckDecl decls
+  opt <- getOpti
+  let declOp = if opt then optimizeDecls optIter else return
+  ldecls' <- declOp ldecls
+  -- printFD4Debug ldecls'
+  let termOp = if opt then optimize optIter else return
+  ppterms <- mapM (fmapM termOp >=> sppDecl) ldecls'
   mapM_ printFD4 ppterms
 
 parseIO :: MonadFD4 m => String -> P a -> String -> m a
@@ -162,12 +174,10 @@ parseIO filename p x = case runP p x filename of
 typecheckDecl :: MonadFD4 m => SDecl STerm -> m (Decl Term)
 typecheckDecl a@(SDeclFun pos _ _ _ _ _) = do
   output <- desugarDecl a
-  opt <- getOpti
   case output of
     DeclFun i n ty t -> do
       elabTerm <- elab t
-      elabTerm' <- optimize (if opt then optIter else 0) elabTerm
-      let dd = DeclFun i n ty elabTerm'
+      let dd = DeclFun i n ty elabTerm
       tcDecl dd
       return dd
     _ -> failPosFD4 pos "Error interpretando una declaracion"
@@ -344,12 +354,10 @@ bytecodeRun fp = do
 typecheckDeclTy :: MonadFD4 m => SDecl STerm -> m (Decl TTerm)
 typecheckDeclTy a@(SDeclFun pos _ _ _ _ _) = do
   output <- desugarDecl a
-  opt <- getOpti
   case output of
     DeclFun i n ty t -> do
       elabTerm <- elab t
-      elabTerm' <- optimize (if opt then optIter else 0) elabTerm
-      let dd = DeclFun i n ty elabTerm'
+      let dd = DeclFun i n ty elabTerm
       dd' <- tcDeclTy dd
       return dd'
     _ -> failPosFD4 pos "Error interpretando una declaracion"
@@ -380,3 +388,7 @@ optimize n term = do
   if b
     then optimize (n - 1) tmm
     else return tmm
+
+optimizeDecls :: MonadFD4 m => Int -> [Decl Term] -> m [Decl Term]
+optimizeDecls 0 xs = return xs
+optimizeDecls n xs = deadCodeEliminationDecl xs >>= optimizeDecls (n - 1)
