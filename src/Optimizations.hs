@@ -9,19 +9,23 @@ import PPrint
 import Subst
 
 -- Constant Folding and Propagation
-cambiado :: MonadFD4 m => Term -> m Term
-cambiado t = modifyOptimiz >> return t
 
 pattern CONST n <- Const _ (CNat n)
 
+changeContstant :: MonadFD4 m => Term -> m Term
+changeContstant t = modifyOptimiz >> constantOpt t
+
 constantOpt :: MonadFD4 m => Term -> m Term
-constantOpt (BinaryOp info bOp (CONST c1) (CONST c2)) = cambiado $ Const info $ CNat $ semOp bOp c1 c2
-constantOpt (BinaryOp _ _ term (CONST 0)) = cambiado term
-constantOpt (BinaryOp _ Add (CONST 0) term) = cambiado term
-constantOpt (IfZ _ (CONST 0) term _) = cambiado term
-constantOpt (IfZ _ (CONST _) _ term) = cambiado term
-constantOpt (Let _ _ _ c@(CONST _) tm) = cambiado $ subst c tm
+constantOpt (BinaryOp info bOp (CONST c1) (CONST c2)) = changeContstant $ Const info $ CNat $ semOp bOp c1 c2
+constantOpt (BinaryOp _ _ term (CONST 0)) = changeContstant term
+constantOpt (BinaryOp _ Add (CONST 0) term) = changeContstant term
+constantOpt (IfZ _ (CONST 0) term _) = changeContstant term
+constantOpt (IfZ _ (CONST _) _ term) = changeContstant term
+constantOpt (Let _ _ _ c@(CONST _) tm) = changeContstant $ subst c tm
 constantOpt t = return t
+
+changeInline :: MonadFD4 m => Term -> m Term
+changeInline t = modifyOptimiz >> inlineAndDead t
 
 inlineAndDead :: MonadFD4 m => Term -> m Term
 inlineAndDead t@(Let info name ty tm1 tm2) = do
@@ -33,12 +37,12 @@ inlineAndDead t@(Let info name ty tm1 tm2) = do
       | calls == 0 = do
         stm <- spp t
         printFD4 $ "Cuidado: Variable sin usar " ++ name ++ " en el término:\n " ++ stm ++ "\n En línea: " ++ show info
-        cambiado tm2
-      | calls == 1 = cambiado $ subst tm1 tm2
-      | calls > 10 = cambiado $ subst tm1 tm2
+        changeInline tm2
+      | calls == 1 = changeInline $ subst' tm1 tm2
+      | calls > 10 = changeInline $ subst tm1 tm2
       | otherwise =
         if size < 10
-          then cambiado $ subst tm1 tm2
+          then changeInline $ subst tm1 tm2
           else return t
 inlineAndDead t = return t
 
@@ -54,7 +58,7 @@ numCall' i (Lam _ _ _ tm) = numCall' (i + 1) tm
 numCall' i (App _ tm1 tm2) = numCall' i tm1 + numCall' i tm2
 numCall' i (Print _ _ tm) = numCall' i tm
 numCall' i (BinaryOp _ _ tm1 tm2) = numCall' i tm1 + numCall' i tm2
-numCall' i (Fix _ _ _ _ _ tm) = numCall' (i + 1) tm
+numCall' i (Fix _ _ _ _ _ tm) = numCall' (i + 2) tm -- Es 2 porque esta el bound a la f y a la x
 numCall' i (IfZ _ tm1 tm2 tm3) = numCall' i tm1 + numCall' i tm2 + numCall' i tm3
 numCall' i (Let _ _ _ tm1 tm2) = numCall' i tm1 + numCall' (i + 1) tm2
 

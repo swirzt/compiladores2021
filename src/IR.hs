@@ -5,13 +5,13 @@ import Lang
 data Ir
   = IrVar Name
   | IrGlobal Name
-  | IrCall Ir [(Ir, Maybe Ty)] Ty Ty
+  | IrCall Ir [(Ir, Maybe Ty)] Ty
   | IrConst Const
   | IrPrint String Ir
   | IrBinaryOp BinaryOp Ir Ir
-  | IrLet Name Ir Ir Ty Ty
-  | IrIfZ Ir Ir Ir Ty
-  | MkClosure Name [Ir] Ty
+  | IrLet Name Ir Ir Ty
+  | IrIfZ Ir Ir Ir
+  | MkClosure Name [Ir]
   | IrAccess Ir Int
   deriving (Show)
 

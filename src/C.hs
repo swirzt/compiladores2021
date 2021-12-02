@@ -52,14 +52,14 @@ stmts xs =
 ir2doc :: Ir -> Doc a
 ir2doc (IrVar n) = name n
 ir2doc (IrGlobal n) = name n
-ir2doc (IrCall f args _ codomi) = parens (parens (ty2Doc codomi <+> pretty "(*)" <+> tupled (argsTy2Doc args)) <+> ir2doc f) <> tupled (map (\(ir, _) -> ir2doc ir) args)
+ir2doc (IrCall f args codomi) = parens (parens (ty2Doc codomi <+> pretty "(*)" <+> tupled (argsTy2Doc args)) <+> ir2doc f) <> tupled (map (\(ir, _) -> ir2doc ir) args)
 ir2doc (IrConst (CNat n)) = pretty n
 ir2doc (IrBinaryOp Add a b) = ir2doc a <+> pretty "+" <+> ir2doc b
 ir2doc (IrBinaryOp Sub a b) = pretty "fd4_sub" <> tupled [ir2doc a, ir2doc b]
-ir2doc (IrLet n t t' tyL _) = stmts [hsep [ty2Doc tyL, name n, pretty "=", ir2doc t] <> semi <> line <> ir2doc t']
-ir2doc (IrIfZ c a b _) = sep [ir2doc c, nest 2 (pretty "?" <+> ir2doc b), nest 2 (colon <+> ir2doc a)]
+ir2doc (IrLet n t t' tyL) = stmts [hsep [ty2Doc tyL, name n, pretty "=", ir2doc t] <> semi <> line <> ir2doc t']
+ir2doc (IrIfZ c a b) = sep [ir2doc c, nest 2 (pretty "?" <+> ir2doc b), nest 2 (colon <+> ir2doc a)]
 ir2doc (IrPrint str t) = stmts [pretty "wprintf" <> parens (pretty "L" <> pretty (show str)), irPrintN (ir2doc t)]
-ir2doc (MkClosure f args _) = pretty "fd4_mkclosure" <> tupled (name f : pretty (length args) : map ir2doc args)
+ir2doc (MkClosure f args) = pretty "fd4_mkclosure" <> tupled (name f : pretty (length args) : map ir2doc args)
 ir2doc (IrAccess t i) = ir2doc t <> brackets (pretty i)
 
 prelude :: Doc a

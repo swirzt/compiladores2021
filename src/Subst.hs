@@ -15,10 +15,10 @@ import Data.List (elemIndex)
 import Lang
 
 varChanger ::
-  (Int -> Pos -> Name -> Term) -> --que hacemos con las variables localmente libres
-  (Int -> Pos -> Int -> Term) -> --que hacemos con los indices de De Bruijn
-  Term ->
-  Term
+  (Int -> info -> Name -> Tm info Var) -> --que hacemos con las variables localmente libres
+  (Int -> info -> Int -> Tm info Var) -> --que hacemos con los indices de De Bruijn
+  Tm info Var ->
+  Tm info Var
 varChanger local bound t = go 0 t
   where
     go n (V p (Bound i)) = bound n p i
@@ -37,7 +37,7 @@ varChanger local bound t = go 0 t
 -- en `t` (que debe ser localmente cerrado) por los nombres libres en la
 -- lista. La variable Bound 0 pasa a ser Free n0, y etc. Estos nombres
 -- deben ser frescos en el término para que no ocurra shadowing.
-openN :: [Name] -> Term -> Term
+openN :: [Name] -> Tm info Var -> Tm info Var
 openN ns = varChanger (\_ p n -> V p (Free n)) bnd
   where
     bnd depth p i
@@ -50,7 +50,7 @@ openN ns = varChanger (\_ p n -> V p (Free n)) bnd
 
 -- `closeN [nn,..,n0] t` es la operación inversa a open. Reemplaza
 -- las variables `Free ni` por la variable ligada `Bound i`.
-closeN :: [Name] -> Term -> Term
+closeN :: [Name] -> Tm info Var -> Tm info Var
 closeN ns = varChanger lcl (\_ p i -> V p (Bound i))
   where
     lcl depth p y =
@@ -72,7 +72,7 @@ closeN ns = varChanger lcl (\_ p i -> V p (Bound i))
 -- por los términos correspondientes. La ventaja es que no hace falta
 -- generar ningún nombre, y por lo tanto evitamos la necesidad de
 -- nombres frescos.
-substN :: [Term] -> Term -> Term
+substN :: [Tm info Var] -> Tm info Var -> Tm info Var
 substN ns = varChanger (\_ p n -> V p (Free n)) bnd
   where
     bnd depth p i
@@ -85,52 +85,26 @@ substN ns = varChanger (\_ p n -> V p (Free n)) bnd
 
 -- Algunas definiciones auxiliares:
 
-subst :: Term -> Term -> Term
+subst' :: Tm info Var -> Tm info Var -> Tm info Var
+subst' ns = varChanger (\_ p n -> V p (Free n)) bnd
+  where
+    bnd depth p i
+      | i < depth = V p (Bound i)
+      | i == depth = ns
+      | otherwise = V p (Bound $ i - 1)
+
+subst :: Tm info Var -> Tm info Var -> Tm info Var
 subst n m = substN [n] m
 
-close :: Name -> Term -> Term
+close :: Name -> Tm info Var -> Tm info Var
 close nm = closeN [nm]
 
-open :: Name -> Term -> Term
+open :: Name -> Tm info Var -> Tm info Var
 open x t = openN [x] t
 
 g2f :: Var -> Var
 g2f (Global name) = Free name
 g2f x = x
 
-global2Free :: Term -> Term
+global2Free :: Tm info Var -> Tm info Var
 global2Free = fmap g2f
-
-------Compilar a C
-varChangerTTerm ::
-  (Int -> Ty -> Name -> TTerm) -> --que hacemos con las variables localmente libres
-  (Int -> Ty -> Int -> TTerm) -> --que hacemos con los indices de De Bruijn
-  TTerm ->
-  TTerm
-varChangerTTerm local bound t = go 0 t
-  where
-    go n (TV (Bound i) tm) = bound n tm i
-    go n (TV (Free x) tm) = local n tm x
-    go _ tm@(TV (Global _) _) = tm
-    go n (TLam y ty tm ty') = TLam y ty (go (n + 1) tm) ty'
-    go n (TApp l r t1 t2) = TApp (go n l) (go n r) t1 t2
-    go n (TFix f fty x xty tm ty) = TFix f fty x xty (go (n + 2) tm) ty
-    go n (TIfZ co tr fa ty) = TIfZ (go n co) (go n tr) (go n fa) ty
-    go _ tm@(TConst _ _) = tm
-    go n (TPrint str tm ty) = TPrint str (go n tm) ty
-    go n (TBinaryOp op tm um ty) = TBinaryOp op (go n tm) (go n um) ty
-    go n (TLet v vty m o ty) = TLet v vty (go n m) (go (n + 1) o) ty
-
-openNTTerm :: [Name] -> TTerm -> TTerm
-openNTTerm ns = varChangerTTerm (\_ ty n -> TV (Free n) ty) bnd
-  where
-    bnd depth ty i
-      | i < depth = TV (Bound i) ty
-      | i >= depth && i < depth + nns =
-        TV (Free (nsr !! (i - depth))) ty
-      | otherwise = abort "openN: M is not LC"
-    nns = length ns
-    nsr = reverse ns
-
-openTTerm :: Name -> TTerm -> TTerm
-openTTerm x t = openNTTerm [x] t

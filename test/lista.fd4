@@ -1,0 +1,9 @@
+type List = (Nat -> Nat -> Nat) -> Nat -> Nat
+let nil (c : Nat -> Nat -> Nat) (n : Nat) : Nat = n
+let cons (x : Nat) (xs : List) (c : Nat -> Nat -> Nat) (n : Nat) : Nat = c x (xs c n)
+let foldr (xs : List) : List = xs
+let rec listador (n : Nat) : List = ifz n then nil else cons n (listador (n-1))
+let rec multiplic (m n : Nat) : Nat = ifz m then 0 else n + multiplic (m - 1) n
+let prit (x y : Nat) : Nat = print "elem " (multiplic x y)
+let p (x : Nat) (f : Nat -> Nat -> Nat) : Nat = let lista : List = listador x in foldr lista f (print "fin " 0)
+let z : Nat = multiplic 10 10

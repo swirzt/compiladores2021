@@ -150,34 +150,35 @@ tcTy ::
   [Ty] ->
   -- | tipo del término y término transformado
   m (Ty, TTerm)
-tcTy (V _ var@(Bound k)) _ ts = let ty = ts !! k in return $ (ty, TV var ty)
+tcTy (V _ var@(Bound k)) _ ts = let ty = ts !! k in return $ (ty, V ty var)
 tcTy (V p var@(Free n)) bs _ = case lookup n bs of
   Nothing -> failPosFD4 p $ "Variable no declarada " ++ ppName n
-  Just ty -> return (ty, TV var ty)
+  Just ty -> return (ty, V ty var)
 tcTy (V p var@(Global n)) bs _ = case lookup n bs of
   Nothing -> failPosFD4 p $ "Variable no declarada " ++ ppName n
-  Just ty -> return (ty, TV var ty)
-tcTy (Const _ k@(CNat _)) _ _ = return (NatTy, TConst k NatTy)
+  Just ty -> return (ty, V ty var)
+tcTy (Const _ k@(CNat _)) _ _ = return (NatTy, Const NatTy k)
 tcTy (Print _ str t) bs ts = do
   (ty, t') <- tcTy t bs ts
   expect NatTy ty t
-  return (ty, TPrint str t' ty)
+  return (ty, Print ty str t')
 tcTy (IfZ _ c t t') bs ts = do
   (tyc, ttmC) <- tcTy c bs ts
   expect NatTy tyc c
   (tyt, ttmT) <- tcTy t bs ts
   (tyt', ttmT') <- tcTy t' bs ts
   expect tyt tyt' t'
-  return (tyt, TIfZ ttmC ttmT ttmT' tyt)
+  return (tyt, IfZ tyt ttmC ttmT ttmT')
 tcTy (Lam _ v ty t) bs ts = do
-  (ty', t') <- tcTy t bs (ty : ts) -- No abre terminos
-  return (FunTy ty ty', TLam v ty t' (FunTy ty ty'))
+  (ty', t') <- tcTy t bs (ty : ts)
+  let newTy = FunTy ty ty'
+  return (newTy, Lam newTy v ty t')
 tcTy (App _ t u) bs ts = do
   (tyt, t') <- tcTy t bs ts
   (domm, codd) <- domCod t tyt
   (tyu, u') <- tcTy u bs ts
   expect domm tyu u
-  return (codd, TApp t' u' domm codd)
+  return (codd, App tyt t' u')
 tcTy (Fix p f fty x xty t) bs ts = do
   (domm, codd) <- domCod (V p (Free f)) fty
   when (domm /= xty) $ do
@@ -187,29 +188,33 @@ tcTy (Fix p f fty x xty t) bs ts = do
       \dominio del tipo de la función"
   (ty', t') <- tcTy t bs (xty : fty : ts)
   expect codd ty' t
-  return (fty, TFix f fty x xty t' fty)
+  return (fty, Fix fty f fty x xty t')
 tcTy (Let _ v ty def t) bs ts = do
   (ty', t') <- tcTy def bs ts
   expect ty ty' def
   (ty'', t'') <- tcTy t bs (ty : ts)
-  return $ (ty'', TLet v ty t' t'' ty'')
+  return $ (ty'', Let ty'' v ty t' t'')
 tcTy (BinaryOp _ op t u) bs ts = do
   (tty, t') <- tcTy t bs ts
   expect NatTy tty t
   (uty, u') <- tcTy u bs ts
   expect NatTy uty u
-  return $ (NatTy, TBinaryOp op t' u' NatTy)
+  return $ (NatTy, BinaryOp NatTy op t' u')
+
+changeCod :: Ty -> Ty -> Ty
+changeCod (FunTy d _) t = FunTy d t
+changeCod _ _ = undefined
 
 changeTy :: TTerm -> Ty -> TTerm
-changeTy (TV var _) t = TV var t
-changeTy (TConst c _) t = TConst c t
-changeTy (TLam n ty tm _) t = TLam n ty tm t
-changeTy (TApp tm1 tm2 ty _) t = TApp tm1 tm2 ty t
-changeTy (TPrint str tm _) t = TPrint str tm t
-changeTy (TBinaryOp bop tm1 tm2 _) t = TBinaryOp bop tm1 tm2 t
-changeTy (TFix f fTy var varTy tm _) t = TFix f fTy var varTy tm t
-changeTy (TIfZ tmb tmt tmf _) t = TIfZ tmb tmt tmf t
-changeTy (TLet name ty tm tm' _) t = TLet name ty tm tm' t
+changeTy (V _ var) t = V t var
+changeTy (Const _ c) t = Const t c
+changeTy (Lam _ n ty tm) t = Lam t n ty tm
+changeTy (App ty tm1 tm2) t = let nT = changeCod ty t in App nT tm1 tm2
+changeTy (Print _ str tm) t = Print t str tm
+changeTy (BinaryOp _ bop tm1 tm2) t = BinaryOp t bop tm1 tm2
+changeTy (Fix _ f fTy var varTy tm) t = Fix t f fTy var varTy tm
+changeTy (IfZ _ tmb tmt tmf) t = IfZ t tmb tmt tmf
+changeTy (Let _ name ty tm tm') t = Let t name ty tm tm'
 
 tcDeclTy :: MonadFD4 m => Decl Term -> m (Decl TTerm)
 tcDeclTy (DeclFun p n t def) = do
