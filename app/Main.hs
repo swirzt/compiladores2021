@@ -159,10 +159,11 @@ typecheckFile f = do
   decls <- loadFile f
   ldecls <- mapM typecheckDecl decls
   opt <- getOpti
-  let declOp = if opt then optimizeDecls optIter else return
+  let (declOp, termOp) =
+        if opt
+          then (optimizeDecls optIter, optimize optIter)
+          else (return, return)
   ldecls' <- declOp ldecls
-  -- printFD4Debug ldecls'
-  let termOp = if opt then optimize optIter else return
   ppterms <- mapM (fmapM termOp >=> sppDecl) ldecls'
   mapM_ printFD4 ppterms
 
@@ -194,7 +195,7 @@ handleDecl d = do
     DeclFun p n ty tt -> do
       te <- eval tt
       addDecl (DeclFun p n ty te)
-    a@(DeclType i n ty) -> addDecl a
+    a@(DeclType _ _ _) -> addDecl a
 
 data Command
   = Compile CompileForm
@@ -391,4 +392,11 @@ optimize n term = do
 
 optimizeDecls :: MonadFD4 m => Int -> [Decl Term] -> m [Decl Term]
 optimizeDecls 0 xs = return xs
-optimizeDecls n xs = deadCodeEliminationDecl xs >>= optimizeDecls (n - 1)
+optimizeDecls n xs = do
+  -- printFD4Debug n
+  ys <- deadCodeEliminationDecl xs
+  b <- getOptimized
+  resetOptimized
+  if b
+    then optimizeDecls (n - 1) ys
+    else return ys

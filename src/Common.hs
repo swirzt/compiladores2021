@@ -21,7 +21,7 @@ data Pos
     Pos !Line !Column
 
 instance Eq Pos where
-  x == y = True
+  _ == _ = True
 
 instance Semigroup Pos where
   i <> NoPos = i

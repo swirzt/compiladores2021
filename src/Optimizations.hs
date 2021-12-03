@@ -3,12 +3,11 @@
 module Optimizations where
 
 import Eval
-import Global
+-- import Global
 import Lang
 import MonadFD4
 import PPrint
 import Subst
-import TypeChecker
 
 -- Constant Folding and Propagation
 pattern CONST :: Int -> Tm info var
@@ -48,7 +47,7 @@ inlineAndDead t@(Let info name _ tm1 tm2) = do
         if size < 10
           then changeInline $ subst' tm1 tm2
           else return t
-inlineAndDead a@(App _ t1@(Lam _ _ _ t) t2) =
+inlineAndDead a@(App _ (Lam _ _ _ t) t2) =
   case t2 of
     CONST _ -> changeInline $ subst' t2 t
     V _ _ -> changeInline $ subst' t2 t
@@ -64,7 +63,7 @@ notPrint (V _ _) = True
 notPrint (Const _ _) = True
 notPrint (Lam _ _ _ tm) = notPrint tm
 notPrint (App _ tm1 tm2) = notPrint tm1 && notPrint tm2
-notPrint (Print _ _ tm) = False
+notPrint (Print _ _ _) = False
 notPrint (BinaryOp _ _ tm1 tm2) = notPrint tm1 && notPrint tm2
 notPrint (Fix _ _ _ _ _ tm) = notPrint tm
 notPrint (IfZ _ tb tt tf) = and [notPrint tb, notPrint tt, notPrint tf]
@@ -112,41 +111,40 @@ termSize (IfZ _ tb tt tf) = 1 + maximum [(termSize tb), (termSize tt), (termSize
 termSize (Let _ _ _ tm1 _) = 1 + termSize tm1 -- Queremos el tamaño del argumento
 
 optimizer :: MonadFD4 m => Term -> m Term
-optimizer t =
-  return t
-    >>= constantOpt
-    >>= inlineAndDead
-    -- >>= cse
-    >>= visitor
+optimizer =
+  constantOpt
+    >=> inlineAndDead
+    -- >=> cse
+    >=> visitor optimizer
 
-visitor :: MonadFD4 m => Term -> m Term
-visitor t@(V _ _) = return t
-visitor t@(Const _ _) = return t
-visitor (Lam info name ty tm) = do
-  tmm <- optimizer tm
+visitor :: MonadFD4 m => (Term -> m Term) -> Term -> m Term
+visitor _ t@(V _ _) = return t
+visitor _ t@(Const _ _) = return t
+visitor f (Lam info name ty tm) = do
+  tmm <- f tm
   return $ Lam info name ty tmm
-visitor (App info tm1 tm2) = do
-  tmm1 <- optimizer tm1
-  tmm2 <- optimizer tm2
+visitor f (App info tm1 tm2) = do
+  tmm1 <- f tm1
+  tmm2 <- f tm2
   return $ App info tmm1 tmm2
-visitor (Print info str tm) = do
-  tmm <- optimizer tm
+visitor f (Print info str tm) = do
+  tmm <- f tm
   return $ Print info str tmm
-visitor (BinaryOp info bOp tm1 tm2) = do
-  tm1' <- optimizer tm1
-  tm2' <- optimizer tm2
+visitor f (BinaryOp info bOp tm1 tm2) = do
+  tm1' <- f tm1
+  tm2' <- f tm2
   return $ BinaryOp info bOp tm1' tm2'
-visitor (Fix info fName fTy vName vTy tm) = do
-  tm' <- optimizer tm
+visitor f (Fix info fName fTy vName vTy tm) = do
+  tm' <- f tm
   return $ Fix info fName fTy vName vTy tm'
-visitor (IfZ info tmb tmt tmf) = do
-  tmb' <- optimizer tmb
-  tmt' <- optimizer tmt
-  tmf' <- optimizer tmf
+visitor f (IfZ info tmb tmt tmf) = do
+  tmb' <- f tmb
+  tmt' <- f tmt
+  tmf' <- f tmf
   return $ IfZ info tmb' tmt' tmf'
-visitor (Let info name ty tm1 tm2) = do
-  tm1' <- optimizer tm1
-  tm2' <- optimizer tm2
+visitor f (Let info name ty tm1 tm2) = do
+  tm1' <- f tm1
+  tm2' <- f tm2
   return $ Let info name ty tm1' tm2'
 
 hasNameTy :: Name -> Ty -> Bool
@@ -156,8 +154,8 @@ hasNameTy name (NameTy nt tt) = name == nt || hasNameTy name tt
 
 hasNameTerm :: Name -> Term -> Bool
 hasNameTerm name (V _ (Global str)) = str == name
-hasNameTerm name (V _ _) = False
-hasNameTerm name (Const _ _) = False
+hasNameTerm _ (V _ _) = False
+hasNameTerm _ (Const _ _) = False
 hasNameTerm name (Lam _ _ ty tm) = hasNameTy name ty || hasNameTerm name tm
 hasNameTerm name (App _ tm1 tm2) = hasNameTerm name tm1 || hasNameTerm name tm2
 hasNameTerm name (Print _ _ tm) = hasNameTerm name tm

@@ -153,7 +153,7 @@ numVars xs =
 
 getCodom :: Ty -> Ty
 getCodom a@(FunTy _ _) = tcodom a
-getCodom a@(NameTy _ t) = getCodom t
+getCodom (NameTy _ t) = getCodom t
 getCodom _ = undefined
 
 resugarDecl :: MonadFD4 m => Decl STerm -> m (SDecl STerm)
@@ -214,7 +214,7 @@ resugar (Let info nv tv tt tm) = do
   stm <- resugar tm
   stv <- resugarTy tv
   case stt of
-    SFix _ nf stf xs tms ->
+    SFix _ nf _ xs tms ->
       if nv == nf
         then do
           let typeF = (iterate getCodom tv) !! (numVars xs)
