@@ -39,8 +39,12 @@ closureConvert (Lam ty name tv tm) = do
   let (names, _) = unzip fvars
   return $ MkClosure fname (fmap IrVar names) -- retornamos el makeClosure
 closureConvert (App ty tm1 tm2) = do
-  let tyDom = tdom ty
-      tyCod = tcodom ty
+  let ttdom (NameTy _ t) = ttdom t
+      ttdom t = tdom t
+      ttcodom (NameTy _ t) = ttcodom t
+      ttcodom t = tcodom t
+      tyDom = ttdom ty
+      tyCod = ttcodom ty
   itm1 <- closureConvert tm1
   itm2 <- closureConvert tm2
   fname <- generateName "t"

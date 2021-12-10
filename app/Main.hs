@@ -147,7 +147,7 @@ compileFile f = do
   decls <- parseIO filename program x
   mapM_ handleDecl decls
 
-fmapM :: MonadFD4 m => (Term -> m Term) -> Decl Term -> m (Decl Term)
+fmapM :: (MonadFD4 m, Show info, Eq info) => (Tm info var -> m (Tm info var)) -> Decl (Tm info var) -> m (Decl (Tm info var))
 fmapM _ d@(DeclType _ _ _) = return d
 fmapM f (DeclFun i n t term) = do
   term' <- f term
@@ -159,12 +159,12 @@ typecheckFile f = do
   decls <- loadFile f
   ldecls <- mapM typecheckDecl decls
   opt <- getOpti
-  let (declOp, termOp) =
+  let declOp =
         if opt
-          then (optimizeDecls optIter, optimize optIter)
-          else (return, return)
+          then optimizeDecls optIter
+          else return
   ldecls' <- declOp ldecls
-  ppterms <- mapM (fmapM termOp >=> sppDecl) ldecls'
+  ppterms <- mapM sppDecl ldecls'
   mapM_ printFD4 ppterms
 
 parseIO :: MonadFD4 m => String -> P a -> String -> m a
@@ -191,7 +191,10 @@ typecheckDecl (SDeclType i n v) = do
 handleDecl :: MonadFD4 m => SDecl STerm -> m ()
 handleDecl d = do
   output <- typecheckDecl d
-  case output of
+  opt <- getOpti
+  let f = if opt then optimize optIter else return
+  output' <- fmapM f output
+  case output' of
     DeclFun p n ty tt -> do
       te <- eval tt
       addDecl (DeclFun p n ty te)
@@ -342,13 +345,17 @@ bytecompileFile fp = do
   xs <- loadFile fp
   ys <- mapM typecheckDecl xs
   ys' <- filterM filterSTypes ys
-  byte <- bytecompileModule ys'
+  opt <- getOpti
+  let f = if opt then optimizeDecls optIter else return
+  zs <- f ys'
+  byte <- bytecompileModule zs
   liftIO $ bcWrite byte (replaceExtension fp ".o")
   return ()
 
 bytecodeRun :: MonadFD4 m => FilePath -> m ()
 bytecodeRun fp = do
   file <- liftIO $ bcRead fp
+  printFD4Debug file
   runBC file
 
 -- Para compilar en C
@@ -372,15 +379,19 @@ ccFile :: MonadFD4 m => FilePath -> m ()
 ccFile fp = do
   xs <- loadFile fp
   ys <- mapM typecheckDeclTy xs
-  let imp = compilaC ys
+  opt <- getOpti
+  let f = if opt then optimize optIter else return
+  ys' <- mapM (fmapM f) ys
+  -- printFD4Debug ys'
+  let imp = compilaC ys'
   liftIO $ cWrite imp (replaceExtension fp ".c")
   return ()
 
 -- Para optimizar
 optIter :: Int
-optIter = 10
+optIter = 100
 
-optimize :: MonadFD4 m => Int -> Term -> m Term
+optimize :: (MonadFD4 m, Show info, Eq info) => Int -> Tm info Var -> m (Tm info Var)
 optimize 0 term = return term
 optimize n term = do
   tmm <- optimizer term
@@ -393,8 +404,7 @@ optimize n term = do
 optimizeDecls :: MonadFD4 m => Int -> [Decl Term] -> m [Decl Term]
 optimizeDecls 0 xs = return xs
 optimizeDecls n xs = do
-  -- printFD4Debug n
-  ys <- deadCodeEliminationDecl xs
+  ys <- optimizerDecl xs >>= mapM (fmapM optimizer)
   b <- getOptimized
   resetOptimized
   if b

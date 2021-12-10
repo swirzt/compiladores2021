@@ -24,7 +24,9 @@ argsTy2Doc ((_, Just ty) : xs) = (ty2Doc ty) : argsTy2Doc xs
 decl2doc :: IrDecl -> Doc a
 decl2doc (IrVal n _ ty) = ty2Doc ty <+> name n <> semi
 decl2doc (IrFun n args t ty) =
-  let tyReturn = ty2Doc (tcodom ty)
+  let ttcodom (NameTy _ tyy) = ttcodom tyy
+      ttcodom tyy = tcodom tyy
+      tyReturn = ty2Doc (ttcodom ty)
    in tyReturn <+> name n <+> tupled (args2Doc args)
         <+> braces (nest 2 (line <> pretty "return" <+> ir2doc t <> semi) <> line)
 decl2doc (IrType n ty) = pretty "#define" <+> name n <+> ty2Doc ty

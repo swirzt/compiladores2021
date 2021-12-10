@@ -7,4 +7,5 @@ let rec multiplic (m n : Nat) : Nat = ifz m then 0 else n + multiplic (m - 1) n
 let prit (x y : Nat) : Nat = print "elem " (multiplic x y)
 let p (x : Nat) (f : Nat -> Nat -> Nat) : Nat = let lista : List = listador x in foldr lista f (print "fin " 1)
 let magia : Nat = 1
-let kaka : Nat = let opti (x : Nat) : Nat = x+1 in (opti 1) + (opti 1) + magia 
+let kaka : Nat -> Nat = let opti (x : Nat) : Nat = x+1 in let nene (n m : Nat) : Nat = n + m in nene ((1 + 1) + (1 + 1) + magia)
+let pepe (x :Nat): Nat = ifz x then (ifz x then 3 else 7) else 7

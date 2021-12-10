@@ -13,9 +13,11 @@ module PPrint
     spp,
     ppSTy,
     sppDecl,
+    spp',
   )
 where
 
+import Common (Pos (NoPos))
 import Data.Text (unpack)
 import Elab (resugar, resugarDecl, resugarTy)
 import Global
@@ -320,6 +322,9 @@ spp t = do
   gdecl <- gets glb
   sterms <- resugar (openAll (map declName gdecl) t)
   return (render . st2doc False $ sterms)
+
+spp' :: MonadFD4 m => Tm info Var -> m String
+spp' = spp . changeInfo NoPos
 
 render :: Doc AnsiStyle -> String
 render = unpack . renderStrict . layoutSmart defaultLayoutOptions

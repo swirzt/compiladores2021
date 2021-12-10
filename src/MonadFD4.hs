@@ -35,6 +35,7 @@ module MonadFD4
     getOptimized,
     modifyOptimized,
     resetOptimized,
+    getFresh,
     MonadFD4,
     module Control.Monad.Except,
     module Control.Monad.State,
@@ -160,6 +161,13 @@ resetOptimized = modify (\s -> s {optimized = False})
 
 modifyOptimized :: MonadFD4 m => m ()
 modifyOptimized = modify (\s -> s {optimized = True})
+
+getFresh :: MonadFD4 m => m Int
+getFresh = do
+  s <- get
+  let num = fresh s
+  modify (const (s {fresh = num + 1}))
+  return num
 
 ----
 -- Importante, no eta-expandir porque GHC no hace una

@@ -138,6 +138,17 @@ getInfo (IfZ i _ _ _) = i
 getInfo (Let i _ _ _ _) = i
 getInfo (BinaryOp i _ _ _) = i
 
+changeInfo :: info2 -> Tm info var -> Tm info2 var
+changeInfo i (V _ v) = V i v
+changeInfo i (Const _ c) = Const i c
+changeInfo i (Lam _ n t tm) = Lam i n t $ changeInfo i tm
+changeInfo i (App _ tm1 tm2) = App i (changeInfo i tm1) (changeInfo i tm2)
+changeInfo i (Print _ str tm) = Print i str $ changeInfo i tm
+changeInfo i (Fix _ fn ft vn vt tm) = Fix i fn ft vn vt $ changeInfo i tm
+changeInfo i (IfZ _ t1 t2 t3) = IfZ i (changeInfo i t1) (changeInfo i t2) (changeInfo i t3)
+changeInfo i (Let _ n t t1 t2) = Let i n t (changeInfo i t1) (changeInfo i t2)
+changeInfo i (BinaryOp _ bop t1 t2) = BinaryOp i bop (changeInfo i t1) (changeInfo i t2)
+
 -- | Obtiene los nombres de variables (abiertas o globales) de un término.
 freeVars :: Tm info Var -> [Name]
 freeVars tm = nubSort $ go tm []
