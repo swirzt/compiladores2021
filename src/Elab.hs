@@ -17,18 +17,18 @@ import Subst
 -- | 'desugar' transforma un termino con azucar sintactico a un NTerm
 desugar :: MonadFD4 m => STerm -> m NTerm
 desugar (SV info var) = return $ V info var
-desugar (SConst info const) = return $ Const info const
+desugar (SConst info c) = return $ Const info c
 desugar (SLam info [] _) = failPosFD4 info "No se dio un argumento a la función"
-desugar (SLam info (([],_): _) _) = failPosFD4 info "No se dio un argumento a la función"
+desugar (SLam info (([], _) : _) _) = failPosFD4 info "No se dio un argumento a la función"
 desugar (SLam info [([n], ty)] stm) = do
   stmDesugar <- desugar stm
   tyDesugar <- desugarTy ty
   return $ Lam info n tyDesugar stmDesugar
-desugar (SLam info [(n:ns,ty)] stm) = do
-  stmDesugar <- desugar (SLam info [(ns,ty)] stm)
+desugar (SLam info [(n : ns, ty)] stm) = do
+  stmDesugar <- desugar (SLam info [(ns, ty)] stm)
   tyDesugar <- desugarTy ty
   return $ Lam info n tyDesugar stmDesugar
-desugar (SLam info (b:bin) stm) = desugar (SLam info [b] $ SLam info bin stm)
+desugar (SLam info (b : bin) stm) = desugar (SLam info [b] $ SLam info bin stm)
 desugar (SApp info stm1 stm2) = do
   stm1Desugar <- desugar stm1
   stm2Desugar <- desugar stm2
@@ -42,18 +42,18 @@ desugar (SBinaryOp info b stm1 stm2) = do
   stm2Desugar <- desugar stm2
   return $ BinaryOp info b stm1Desugar stm2Desugar
 desugar (SFix info _ _ [] _) = failPosFD4 info "Falta el argumento del fix"
-desugar (SFix info _ _ (([],_): _) _) = failPosFD4 info "Falta el argumento del fix"
+desugar (SFix info _ _ (([], _) : _) _) = failPosFD4 info "Falta el argumento del fix"
 desugar (SFix info f fty [([n], sty)] stm) = do
   stmDesugar <- desugar stm
   ftyDesugar <- desugarTy fty
   tyDesugar <- desugarTy sty
   return $ Fix info f ftyDesugar n tyDesugar stmDesugar
-desugar (SFix info f fty [(n:ns, sty)] stm) = do
-  stmDesugar <- desugar (SLam info [(ns,sty)] stm)
+desugar (SFix info f fty [(n : ns, sty)] stm) = do
+  stmDesugar <- desugar (SLam info [(ns, sty)] stm)
   ftyDesugar <- desugarTy fty
   tyDesugar <- desugarTy sty
   return $ Fix info f ftyDesugar n tyDesugar stmDesugar
-desugar (SFix info f fty (b:bin) stm) = desugar (SFix info f fty [b] $ SLam info bin stm)
+desugar (SFix info f fty (b : bin) stm) = desugar (SFix info f fty [b] $ SLam info bin stm)
 desugar (SIfZ info stmb stmt stmf) = do
   stmb' <- desugar stmb
   stmt' <- desugar stmt
@@ -76,14 +76,14 @@ desugar (SLet info f [([n], sty)] lty stmt stmt' True) = do
   stmtDesugar' <- desugar stmt'
   fixTyDesugar <- desugarTy fixType
   return $ Let info f fixTyDesugar stmtDesugar stmtDesugar'
-desugar (SLet info f [(n:ns, sty)] lty stmt stmt' True) =
+desugar (SLet info f [(n : ns, sty)] lty stmt stmt' True) =
   let newTy = nConcatTy (length ns) sty lty
-      newTM = SLam info [(ns,sty)] stmt
-  in desugar $ SLet info f [([n],sty)] newTy newTM stmt' True
-desugar (SLet info f (b:bin) lty stmt stmt' True) = 
+      newTM = SLam info [(ns, sty)] stmt
+   in desugar $ SLet info f [([n], sty)] newTy newTM stmt' True
+desugar (SLet info f (b : bin) lty stmt stmt' True) =
   let newTM = SLam info bin stmt
       newTy = concatTy bin lty
-  in desugar $ SLet info f [b] newTy newTM stmt' True
+   in desugar $ SLet info f [b] newTy newTM stmt' True
 
 desugarTy :: MonadFD4 m => STy -> m Ty
 desugarTy SNatTy = return NatTy
@@ -99,7 +99,7 @@ desugarTy (SVarTy n) = do
 
 nConcatTy :: Int -> STy -> STy -> STy
 nConcatTy 1 t1 t2 = SFunTy t1 t2 -- No debería llegar a n = 0
-nConcatTy n t1 t2 = SFunTy t1 (nConcatTy (n-1) t1 t2)
+nConcatTy n t1 t2 = SFunTy t1 (nConcatTy (n - 1) t1 t2)
 
 concatTy :: [([a], STy)] -> STy -> STy
 concatTy [] t = t
@@ -107,9 +107,6 @@ concatTy ((ys, sty) : xs) t = nConcatTy (length ys) sty (concatTy xs t)
 
 desugarConcatTy :: MonadFD4 m => [([a], STy)] -> STy -> m Ty
 desugarConcatTy xs a = desugarTy $ concatTy xs a
-
--- desugar ( Si la primer lista de Let es vacio es sin sugar
--- desugar (SType info Name STy
 
 -- 'elab' transforma variables ligadas en índices de de Bruijn
 -- en un término dado.
@@ -139,28 +136,41 @@ elab' env (Let p v vty def body) = Let p v vty (elab' env def) (close v (elab' (
 
 desugarDecl :: MonadFD4 m => SDecl STerm -> m (Decl STerm)
 desugarDecl (SDeclFun pos name vars ty def False) = do
-  tyDesugar <- desugarConcatTy vars ty 
+  tyDesugar <- desugarConcatTy vars ty
   case vars of
     [] -> return $ DeclFun pos name tyDesugar def
-    _ -> return $ DeclFun pos name tyDesugar (SLam pos vars def) 
-desugarDecl (SDeclFun pos name vars ty def True) = do 
+    _ -> return $ DeclFun pos name tyDesugar (SLam pos vars def)
+desugarDecl (SDeclFun pos name vars ty def True) = do
   tyDesugar <- desugarConcatTy vars ty
   return $ DeclFun pos name tyDesugar (SFix pos name (concatTy vars ty) vars def)
 desugarDecl _ = failFD4 "Si llegué acá algo esta mal jej"
 
 -- Cantidad total de variables, considerando multibinders
-numVars :: [([Name],STy)] -> Int
-numVars xs = let xs' = map (\(ys,_) -> length ys) xs
-             in foldl (+) 0 xs'
+numVars :: [([Name], STy)] -> Int
+numVars xs =
+  let xs' = map (\(ys, _) -> length ys) xs
+   in foldl (+) 0 xs'
+
+getCodom :: Ty -> Ty
+getCodom a@(FunTy _ _) = tcodom a
+getCodom (NameTy _ t) = getCodom t
+getCodom _ = undefined
 
 resugarDecl :: MonadFD4 m => Decl STerm -> m (SDecl STerm)
 resugarDecl (DeclFun pos name ty def) = do
   sty <- resugarTy ty
   case def of
-    SLam _ vars tt -> return $ SDeclFun pos name vars ((iterate codom sty) !! (numVars vars)) tt False
-    SFix _ fname fty vars tt -> if name == fname
-                                then return $ SDeclFun pos fname vars ((iterate codom sty) !! (numVars vars)) tt True
-                                else return $ SDeclFun pos name [] sty def False
+    SLam _ vars tt -> do
+      let typeF = (iterate getCodom ty) !! (numVars vars)
+      typeFR <- resugarTy typeF
+      return $ SDeclFun pos name vars typeFR tt False
+    SFix _ fname _ vars tt ->
+      if name == fname
+        then do
+          let typeF = (iterate getCodom ty) !! (numVars vars)
+          typeFR <- resugarTy typeF
+          return $ SDeclFun pos fname vars typeFR tt True
+        else return $ SDeclFun pos name [] sty def False
     _ -> return $ SDeclFun pos name [] sty def False
 resugarDecl _ = failFD4 "Si llegué acá algo esta mal jej"
 
@@ -171,8 +181,10 @@ resugar (Lam info fv tv tm) = do
   stm <- resugar tm
   tvs <- resugarTy tv
   case stm of
-    SLam _ ((var, tyVarS):xs) tms -> if tyVarS == tvs then return $ SLam info ((fv:var, tyVarS):xs) tms
-                                                      else return $ SLam info (([fv],tvs):(var, tyVarS):xs) tms
+    SLam _ ((var, tyVarS) : xs) tms ->
+      if tyVarS == tvs
+        then return $ SLam info ((fv : var, tyVarS) : xs) tms
+        else return $ SLam info (([fv], tvs) : (var, tyVarS) : xs) tms
     SPrint _ str (SV _ fvp) ->
       if fv == fvp
         then return $ SPrintEta info str
@@ -192,22 +204,27 @@ resugar (Fix info nf tf nv tv tm) = do
   tfs <- resugarTy tf
   tvs <- resugarTy tv
   case stm of
-    SLam _ ((var, tyVarS):xs) tms -> if tyVarS == tvs then return $ SFix info nf tfs ((nv:var,tyVarS):xs) tms
-                                                      else return $ SFix info nf tfs (([nv],tyVarS):(var,tyVarS):xs) tms
+    SLam _ ((var, tyVarS) : xs) tms ->
+      if tyVarS == tvs
+        then return $ SFix info nf tfs ((nv : var, tyVarS) : xs) tms
+        else return $ SFix info nf tfs (([nv], tyVarS) : (var, tyVarS) : xs) tms
     _ -> return $ SFix info nf tfs [([nv], tvs)] stm
 resugar (Let info nv tv tt tm) = do
   stt <- resugar tt
   stm <- resugar tm
   stv <- resugarTy tv
   case stt of
-    SFix _ nf stf xs tms ->
+    SFix _ nf _ xs tms ->
       if nv == nf
-        then let typeF = (iterate codom stf) !! (numVars xs)
-             in return $ SLet info nf xs typeF tms stm True
+        then do
+          let typeF = (iterate getCodom tv) !! (numVars xs)
+          typeFR <- resugarTy typeF
+          return $ SLet info nf xs typeFR tms stm True
         else return $ SLet info nv [] stv stt stm False
     SLam _ xs tm2 -> do
-      let typeF = (iterate codom stv) !! (numVars xs) --Para obtener el codominio n veces
-      return $ SLet info nv xs typeF tm2 stm False
+      let typeF = (iterate getCodom tv) !! (numVars xs) --Para obtener el codominio n veces
+      typeFR <- resugarTy typeF
+      return $ SLet info nv xs typeFR tm2 stm False
     _ -> return $ SLet info nv [] stv stt stm False
 resugar (IfZ info tmb tmt tmf) = do
   stmb' <- resugar tmb
@@ -221,45 +238,4 @@ resugarTy (FunTy x y) = do
   xx <- resugarTy x
   yy <- resugarTy y
   return (SFunTy xx yy)
-resugarTy (NameTy n ty) = return $ SVarTy n
-
--- getTy :: TTerm -> Ty
--- getTy (TV _ t) = t
--- getTy (TConst _ t) = t
--- getTy (TLam _ _ _ t) = t
--- getTy (TApp _ _ t) = t
--- getTy (TPrint _ _ t) = t
--- getTy (TBinaryOp _ _ _ t) = t
--- getTy (TFix _ _ _ _ _ t) = t
--- getTy (TIfZ _ _ _ t) = t
--- getTy (TLet _ _ _ _ t) = t
-
--- --Consulta para Mauro: ¿En que orden se guardan los tipos en el entorno? ¿Nos complican los indices de deBroin?
--- typer :: MonadFD4 m => Term -> [Ty] -> m TTerm
--- typer (V i var) xs = case var of
---                         Bound k -> return $ TV var (xs !! k)
---                         Global n -> do t <- lookupTy n
---                                        case t of
---                                          Just ty -> return $ TV var ty
---                                          Nothing -> failFD4 "error de tipo" -- No debería
---                         Free n -> failFD4 "No esperabamos variables libres"
--- typer (Const i k) xs = return $ TConst k NatTy
--- typer (Lam i name ty tm) xs = do tm' <- typer tm (ty:xs)
---                                  return $ TLam name ty tm' (getTy tm')
--- typer (App i tm1 tm2) xs = do tm1' <- typer tm1 xs
---                               tm2' <- typer tm2 xs
---                               return $ TApp tm1' tm2' (tcodom $ getTy tm1') --Meter el tipo de tm1'
--- typer (Print i str tm) xs = do tm' <- typer tm xs
---                                return $ TPrint str tm' (getTy tm')
--- typer (BinaryOp i bOp tm1 tm2) xs = do tm1' <- typer tm1 xs
---                                        tm2' <- typer tm2 xs
---                                        return $ TBinaryOp bOp tm1' tm2' NatTy
--- typer (Fix i fName fTy vName vTy tm) xs = do tm' <- typer tm (vTy:fTy:xs)
---                                              return $ TFix fName fTy vName vTy tm' fTy
--- typer (IfZ i tmb tmt tmf) xs = do tmb' <- typer tmb xs
---                                   tmt' <- typer tmt xs
---                                   tmf' <- typer tmf xs
---                                   return $ TIfZ tmb' tmt' tmf' (getTy tmt')
--- typer (Let i vName vTy tm1 tm2) xs = do tm1' <- typer tm1 xs
---                                         tm2' <- typer tm2 (vTy:xs)
---                                         return $ TLet vName vTy tm1' tm2' (getTy tm2')
+resugarTy (NameTy n _) = return $ SVarTy n

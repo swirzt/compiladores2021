@@ -23,7 +23,7 @@ import Subst
 
 type Opcode = Int
 
-type Bytecode = [Int]
+type Bytecode = [Opcode]
 
 newtype Bytecode32 = BC {un32 :: [Word32]}
 
@@ -133,8 +133,8 @@ bc (IfZ _ tmb tmt tmf) = do
   let tLen = length tst + 2 -- Tengo que saltear el SKIP y el largo del False
   let fLen = length tsf
   return $ tsb ++ [IFZ, tLen] ++ tst ++ [SKIP, fLen] ++ tsf
-bc (V _ (Free name)) = undefined
-bc (V _ (Global n)) = undefined
+bc (V _ (Free _)) = undefined
+bc (V _ (Global _)) = undefined
 
 bt :: MonadFD4 m => Term -> m Bytecode
 bt (App _ tm1 tm2) = do
@@ -146,7 +146,6 @@ bt (IfZ _ tmb tmt tmf) = do
   tst <- bt tmt
   tsf <- bt tmf
   let tLen = length tst
-  let fLen = length tsf
   return $ tsb ++ [IFZ, tLen] ++ tst ++ tsf
 bt (Let _ _ _ tm1 tm2) = do
   ts1 <- bc tm1
@@ -159,57 +158,22 @@ bt t = do
 stringToUnicode :: String -> [Int]
 stringToUnicode xs = map ord xs
 
-unicodeToString :: [Int] -> String
-unicodeToString xs = map chr xs
-
 type Module = [Decl Term]
 
 bytecompileModule :: MonadFD4 m => Module -> m Bytecode
 bytecompileModule xs = do
   tm <- declToLet xs
-  tm' <- closeLet tm
-  ys <- bc tm'
+  ys <- bc tm
   return $ ys ++ [PRINTN, STOP]
 
+-- Esto es un fold?
 declToLet :: MonadFD4 m => Module -> m Term
-declToLet [DeclFun pos name ty body] = do
-  let bodyf = global2Free body
-  return $ Let pos name ty bodyf (V pos (Bound 0))
+declToLet [DeclFun _ _ _ body] = return $ global2Free body
 declToLet (DeclFun pos name ty body : xs) = do
   tm <- declToLet xs
   let bodyf = global2Free body
-  return $ Let pos name ty bodyf tm
+  return $ Let pos name ty bodyf (close name tm)
 declToLet _ = undefined -- Para calmar al linter
-
-closeLet :: MonadFD4 m => Term -> m Term
-closeLet a@(V _ _) = return a
-closeLet c@(Const _ _) = return c
-closeLet (Lam info name ty tm) = do
-  tm' <- closeLet tm
-  return $ Lam info name ty tm'
-closeLet (App info tm1 tm2) = do
-  tm1' <- closeLet tm1
-  tm2' <- closeLet tm2
-  return $ App info tm1' tm2'
-closeLet (Print info string tm) = do
-  tm' <- closeLet tm
-  return $ Print info string tm'
-closeLet (BinaryOp info op tm1 tm2) = do
-  tm1' <- closeLet tm1
-  tm2' <- closeLet tm2
-  return $ BinaryOp info op tm1' tm2'
-closeLet (Fix info name1 ty1 name2 ty2 tm) = do
-  tm' <- closeLet tm
-  return $ Fix info name1 ty1 name2 ty2 tm'
-closeLet (IfZ info tm tt tf) = do
-  tm' <- closeLet tm
-  tt' <- closeLet tt
-  tf' <- closeLet tf
-  return $ IfZ info tm' tt' tf'
-closeLet (Let info name ty body tm) = do
-  tm' <- closeLet tm
-  body' <- closeLet body
-  return $ Let info name ty body' (close name tm')
 
 -- | Toma un bytecode, lo codifica y lo escribe un archivo
 bcWrite :: Bytecode -> FilePath -> IO ()
@@ -233,9 +197,8 @@ runBC' (CONST : n : c) e s = runBC' c e (I n : s)
 runBC' (ADD : c) e (I n : I m : s) = runBC' c e (I (m + n) : s)
 runBC' (ADD : _) _ _ = failFD4 "Error al ejecutar ADD"
 runBC' (SUB : c) e (I n : I m : s) =
-  if m > n
-    then runBC' c e (I (m - n) : s)
-    else runBC' c e (I 0 : s)
+  let k = max 0 (m - n)
+   in runBC' c e (I k : s)
 runBC' (SUB : _) _ _ = failFD4 "Error al ejecutar SUB"
 runBC' (ACCESS : i : c) e s = runBC' c e (e !! i : s)
 runBC' (CALL : c) e (v : Fun ef cf : s) = runBC' cf (v : ef) (RA e c : s)
@@ -244,14 +207,14 @@ runBC' (FUNCTION : l : c) e s = runBC' (drop l c) e (Fun e (take l c) : s)
 runBC' (RETURN : _) _ (v : (RA e c) : s) = runBC' c e (v : s)
 runBC' (RETURN : _) _ _ = failFD4 "Error al ejecutar RETURN"
 runBC' (SHIFT : c) e (v : s) = runBC' c (v : e) s
-runBC' (DROP : c) (v : e) s = runBC' c e s
-runBC' (PRINTN : c) e st@(I n : s) = do
+runBC' (DROP : c) (_ : e) s = runBC' c e s
+runBC' (PRINTN : c) e st@(I n : _) = do
   printFD4 (show n)
   runBC' c e st
 runBC' (PRINTN : _) _ _ = failFD4 "Error al ejecutar PRINTN"
 runBC' (PRINT : c) e s = printStr c e s
-runBC' (FIX : c) e (Fun ef cf : s) = let efix = Fun efix cf : e in runBC' c e (Fun efix cf : s)
-runBC' (FIX : c) _ _ = failFD4 "Error al ejecutar FIX"
+runBC' (FIX : c) e (Fun _ cf : s) = let efix = Fun efix cf : e in runBC' c e (Fun efix cf : s)
+runBC' (FIX : _) _ _ = failFD4 "Error al ejecutar FIX"
 runBC' (STOP : _) _ _ = return ()
 runBC' (IFZ : tLen : c) e (I n : s) =
   if n == 0
@@ -259,7 +222,7 @@ runBC' (IFZ : tLen : c) e (I n : s) =
     else runBC' (drop tLen c) e s
 runBC' (IFZ : _) _ _ = failFD4 "Error al ejecutar IFZ"
 runBC' (SKIP : len : c) e s = runBC' (drop len c) e s
-runBC' (TAILCALL : c) e (v : Fun ef cf : s) = runBC' cf (v : ef) s
+runBC' (TAILCALL : _) _ (v : Fun ef cf : s) = runBC' cf (v : ef) s
 runBC' (TAILCALL : _) _ _ = failFD4 "Error al ejecutar TAILCALL"
 runBC' _ _ _ = failFD4 "Pasaron cosas"
 

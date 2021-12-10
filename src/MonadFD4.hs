@@ -30,6 +30,12 @@ module MonadFD4
     addTy,
     addTyDef,
     catchErrors,
+    getMode,
+    getOpti,
+    getOptimized,
+    modifyOptimized,
+    resetOptimized,
+    getFresh,
     MonadFD4,
     module Control.Monad.Except,
     module Control.Monad.State,
@@ -81,35 +87,46 @@ addTy n ty = modify (\s -> s {tyEnv = (n, ty) : tyEnv s})
 addTyDef :: MonadFD4 m => Name -> Ty -> m ()
 addTyDef n ty = modify (\s -> s {typeDefs = (n, ty) : typeDefs s}) --Haskell me da miedo
 
+sepByDecl :: [Decl Term] -> ([Decl Term], [Decl Term])
+sepByDecl [] = ([], [])
+sepByDecl (d@DeclFun {} : xs) =
+  let (ys, zs) = sepByDecl xs
+   in (d : ys, zs)
+sepByDecl (d@DeclType {} : xs) =
+  let (ys, zs) = sepByDecl xs
+   in (ys, d : zs)
+
 eraseLastFileDecls :: MonadFD4 m => m ()
 eraseLastFileDecls = do
   s <- get
   let n = cantDecl s
-      (era, rem) = splitAt n (glb s)
-      tyEnv' = deleteTy (map declName era) (tyEnv s)
-  modify (\s -> s {glb = rem, cantDecl = 0, tyEnv = tyEnv'})
+      (era, remaining) = splitAt n (glb s)
+      (fun, typ) = sepByDecl era
+      tyEnv' = deleteTy (map declName fun) (tyEnv s)
+      typeDefs' = deleteTy (map declName typ) (typeDefs s)
+  modify (\st -> st {glb = remaining, cantDecl = 0, tyEnv = tyEnv', typeDefs = typeDefs'})
   where
     deleteTy xs ps = deleteFirstsBy (\x y -> fst x == fst y) ps (map (flip (,) NatTy) xs)
 
 hasName :: Name -> Decl a -> Bool
 hasName nm (DeclFun {declName = nm'}) = nm == nm'
+hasName nm (DeclType {declName = nm'}) = nm == nm'
 
 lookupDecl :: MonadFD4 m => Name -> m (Maybe Term)
 lookupDecl nm = do
   s <- get
-  case filter (hasName nm) (glb s) of
-    (DeclFun {declBody = e}) : _ -> return (Just e)
-    [] -> return Nothing
+  ret (filter (hasName nm) (glb s))
+  where
+    ret xs = case xs of
+      (DeclFun {declBody = e}) : _ -> return (Just e)
+      (DeclType {}) : ys -> ret ys
+      [] -> return Nothing
 
 lookupTy :: MonadFD4 m => Name -> m (Maybe Ty)
-lookupTy nm = do
-  s <- get
-  return $ lookup nm (tyEnv s)
+lookupTy nm = get >>= return . (lookup nm) . tyEnv
 
 lookupTyDef :: MonadFD4 m => Name -> m (Maybe Ty)
-lookupTyDef nm = do
-  s <- get
-  return $ lookup nm (typeDefs s)
+lookupTyDef nm = get >>= return . (lookup nm) . typeDefs
 
 failPosFD4 :: MonadFD4 m => Pos -> String -> m a
 failPosFD4 p s = throwError (ErrPos p s)
@@ -130,6 +147,28 @@ catchErrors c =
 printFD4Char :: MonadFD4 m => Char -> m ()
 printFD4Char = liftIO . putChar
 
+getMode :: MonadFD4 m => m (Maybe Mode)
+getMode = get >>= return . mode
+
+getOpti :: MonadFD4 m => m Bool
+getOpti = get >>= return . opti
+
+getOptimized :: MonadFD4 m => m Bool
+getOptimized = get >>= return . optimized
+
+resetOptimized :: MonadFD4 m => m ()
+resetOptimized = modify (\s -> s {optimized = False})
+
+modifyOptimized :: MonadFD4 m => m ()
+modifyOptimized = modify (\s -> s {optimized = True})
+
+getFresh :: MonadFD4 m => m Int
+getFresh = do
+  s <- get
+  let num = fresh s
+  modify (const (s {fresh = num + 1}))
+  return num
+
 ----
 -- Importante, no eta-expandir porque GHC no hace una
 -- eta-contracción de sinónimos de tipos
@@ -144,8 +183,8 @@ type FD4 = StateT GlEnv (ExceptT Error IO)
 instance MonadFD4 FD4
 
 -- 'runFD4\'' corre una computación de la mónad 'FD4' en el estado inicial 'Global.initialEnv'
-runFD4' :: FD4 a -> IO (Either Error (a, GlEnv))
-runFD4' c = runExceptT $ runStateT c initialEnv
+runFD4' :: Bool -> Maybe Mode -> FD4 a -> IO (Either Error (a, GlEnv))
+runFD4' b m c = runExceptT $ runStateT c (initialEnv {mode = m, opti = b})
 
-runFD4 :: FD4 a -> IO (Either Error a)
-runFD4 c = fmap fst <$> runFD4' c
+runFD4 :: Bool -> Maybe Mode -> FD4 a -> IO (Either Error a)
+runFD4 b m c = fmap fst <$> runFD4' b m c

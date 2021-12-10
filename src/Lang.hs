@@ -30,8 +30,8 @@ instance Eq Ty where
   NatTy == FunTy _ _ = False
   FunTy _ _ == NatTy = False
   FunTy x y == FunTy w z = x == w && y == z
-  NameTy n t == x = t == x
-  x == NameTy n t = x == t
+  NameTy _ t == x = t == x
+  x == NameTy _ t = x == t
 
 -- | AST de Tipos con Sugar
 data STy
@@ -43,14 +43,18 @@ data STy
 type Name = String
 
 newtype Const = CNat Int
-  deriving (Show)
+  deriving (Show, Eq)
 
 data BinaryOp = Add | Sub
-  deriving (Show)
+  deriving (Show, Eq)
 
 -- | tipo de datos de declaraciones, parametrizado por el tipo del cuerpo de la declaración
 data Decl a
-  = DeclType Pos Name Ty
+  = DeclType
+      { declPos :: Pos,
+        declName :: Name,
+        declType :: Ty
+      }
   | DeclFun
       { declPos :: Pos,
         declName :: Name,
@@ -85,7 +89,7 @@ data Tm info var
   | Fix info Name Ty Name Ty (Tm info var)
   | IfZ info (Tm info var) (Tm info var) (Tm info var)
   | Let info Name Ty (Tm info var) (Tm info var)
-  deriving (Show, Functor)
+  deriving (Show, Functor, Eq)
 
 data STm info var
   = SV info var
@@ -110,29 +114,17 @@ type NTerm =
   Tm Pos Name
 
 type Term =
-  -- | 'Tm' con índices de De Bruijn como variables ligadas, y nombres para libres y globales, guarda posición`
+  -- | 'Tm' con índices de De Bruijn como variables ligadas, y nombres para libres y globales, guarda posición
   Tm Pos Var
 
-data TTm var
-  = TV var Ty
-  | TConst Const Ty
-  | TLam Name Ty (TTm var) Ty
-  | TApp (TTm var) (TTm var) Ty Ty
-  | TPrint String (TTm var) Ty
-  | TBinaryOp BinaryOp (TTm var) (TTm var) Ty
-  | TFix Name Ty Name Ty (TTm var) Ty
-  | TIfZ (TTm var) (TTm var) (TTm var) Ty
-  | TLet Name Ty (TTm var) (TTm var) Ty
-  deriving (Show, Functor)
-
 type TTerm =
-  TTm Var
+  Tm Ty Var
 
 data Var
   = Bound !Int
   | Free Name
   | Global Name
-  deriving (Show)
+  deriving (Show, Eq)
 
 -- | Obtiene la info en la raíz del término.
 getInfo :: Tm info var -> info
@@ -145,6 +137,17 @@ getInfo (Fix i _ _ _ _ _) = i
 getInfo (IfZ i _ _ _) = i
 getInfo (Let i _ _ _ _) = i
 getInfo (BinaryOp i _ _ _) = i
+
+changeInfo :: info2 -> Tm info var -> Tm info2 var
+changeInfo i (V _ v) = V i v
+changeInfo i (Const _ c) = Const i c
+changeInfo i (Lam _ n t tm) = Lam i n t $ changeInfo i tm
+changeInfo i (App _ tm1 tm2) = App i (changeInfo i tm1) (changeInfo i tm2)
+changeInfo i (Print _ str tm) = Print i str $ changeInfo i tm
+changeInfo i (Fix _ fn ft vn vt tm) = Fix i fn ft vn vt $ changeInfo i tm
+changeInfo i (IfZ _ t1 t2 t3) = IfZ i (changeInfo i t1) (changeInfo i t2) (changeInfo i t3)
+changeInfo i (Let _ n t t1 t2) = Let i n t (changeInfo i t1) (changeInfo i t2)
+changeInfo i (BinaryOp _ bop t1 t2) = BinaryOp i bop (changeInfo i t1) (changeInfo i t2)
 
 -- | Obtiene los nombres de variables (abiertas o globales) de un término.
 freeVars :: Tm info Var -> [Name]
@@ -162,17 +165,17 @@ freeVars tm = nubSort $ go tm []
     go (Const _ _) xs = xs
     go (Let _ _ _ e t) xs = go e (go t xs)
 
-freeVarsTTerm :: TTerm -> [(Name,Ty)]
-freeVarsTTerm tm = nubSort $ go tm [] 
+freeVarsInfo :: Ord info => Tm info Var -> [(Name, info)]
+freeVarsInfo tm = nubSort $ go tm []
   where
-    go (TV (Free v) ty) xs = (v,ty) : xs
-    go (TV (Global v) ty) xs = (v,ty) : xs
-    go (TV _ _) xs = xs
-    go (TLam _ _ t _) xs = go t xs
-    go (TApp l r _ _) xs = go l $ go r xs
-    go (TPrint _ t _) xs = go t xs
-    go (TBinaryOp _ t u _) xs = go t $ go u xs
-    go (TFix _ _ _ _ t _) xs = go t xs
-    go (TIfZ c t e _) xs = go c $ go t $ go e xs
-    go (TConst _ _) xs = xs
-    go (TLet _ _ e t _) xs = go e (go t xs)
+    go (V ty (Free v)) xs = (v, ty) : xs
+    go (V ty (Global v)) xs = (v, ty) : xs
+    go (V _ _) xs = xs
+    go (Lam _ _ _ t) xs = go t xs
+    go (App _ l r) xs = go l $ go r xs
+    go (Print _ _ t) xs = go t xs
+    go (BinaryOp _ _ t u) xs = go t $ go u xs
+    go (Fix _ _ _ _ _ t) xs = go t xs
+    go (IfZ _ c t e) xs = go c $ go t $ go e xs
+    go (Const _ _) xs = xs
+    go (Let _ _ _ e t) xs = go e (go t xs)

@@ -13,17 +13,17 @@ module PPrint
     spp,
     ppSTy,
     sppDecl,
+    spp',
   )
 where
 
-import Data.Text (empty, unpack)
-import Data.Text.Prettyprint.Doc
---( (<+>), nest, parens, sep, pretty, Doc, layoutSmart, defaultLayoutOptions, annotate )
-
+import Common (Pos (NoPos))
+import Data.Text (unpack)
 import Elab (resugar, resugarDecl, resugarTy)
 import Global
 import Lang
 import MonadFD4
+import Prettyprinter
 import Prettyprinter.Render.Terminal
   ( AnsiStyle,
     Color (..),
@@ -45,12 +45,12 @@ freshen ns n =
 -- Debe tener cuidado de no abrir términos con nombres que ya fueron abiertos.
 -- Estos nombres se encuentran en la lista ns (primer argumento).
 openAll :: [Name] -> Term -> NTerm
-openAll ns (V p v) = case v of
+openAll _ (V p v) = case v of
   Bound i -> V p $ "(Bound " ++ show i ++ ")" --este caso no debería aparecer
   --si el término es localmente cerrado
   Free x -> V p x
   Global x -> V p x
-openAll ns (Const p c) = Const p c
+openAll _ (Const p c) = Const p c
 openAll ns (Lam p x ty t) =
   let x' = freshen ns x
    in Lam p x' ty (openAll (x' : ns) (open x' t))
@@ -71,7 +71,7 @@ constColor = annotate (color Red)
 
 opColor = annotate (colorDull Green)
 
-keywordColor = annotate (colorDull Green) -- <> bold)
+keywordColor = annotate (colorDull Green <> bold)
 
 stringColor = annotate (colorDull Yellow)
 
@@ -104,7 +104,7 @@ ty2doc :: Ty -> Doc AnsiStyle
 ty2doc NatTy = typeColor (pretty "Nat")
 ty2doc (FunTy x@(FunTy _ _) y) = sep [parens (ty2doc x), typeOpColor (pretty "->"), ty2doc y]
 ty2doc (FunTy x y) = sep [ty2doc x, typeOpColor (pretty "->"), ty2doc y]
-ty2doc (NameTy n t) = name2doc n
+ty2doc (NameTy n _) = name2doc n
 
 sty2doc :: STy -> Doc AnsiStyle
 sty2doc SNatTy = typeColor (pretty "Nat")
@@ -152,8 +152,8 @@ t2doc ::
   Doc AnsiStyle
 -- Uncomment to use the Show instance for STerm
 {- t2doc at x = text (show x) -}
-t2doc at (V _ x) = name2doc x
-t2doc at (Const _ c) = c2doc c
+t2doc _ (V _ x) = name2doc x
+t2doc _ (Const _ c) = c2doc c
 t2doc at (Lam _ v ty t) =
   parenIf at $
     sep
@@ -214,8 +214,8 @@ st2doc ::
   Doc AnsiStyle
 -- Uncomment to use the Show instance for STerm
 {- t2doc at x = text (show x) -}
-st2doc at (SV _ x) = name2doc x
-st2doc at (SConst _ c) = c2doc c
+st2doc _ (SV _ x) = name2doc x
+st2doc _ (SConst _ c) = c2doc c
 st2doc at (SLam _ xs t) =
   parenIf at $
     sep
@@ -302,7 +302,7 @@ binding2doc (x, ty) =
 sname2doc :: [Name] -> Doc AnsiStyle
 sname2doc [] = mempty
 sname2doc [x] = name2doc x
-sname2doc (x:xs) = name2doc x <+> sname2doc xs
+sname2doc (x : xs) = name2doc x <+> sname2doc xs
 
 sbinding2doc :: [([Name], STy)] -> Doc AnsiStyle
 sbinding2doc [] = mempty
@@ -322,6 +322,9 @@ spp t = do
   gdecl <- gets glb
   sterms <- resugar (openAll (map declName gdecl) t)
   return (render . st2doc False $ sterms)
+
+spp' :: MonadFD4 m => Tm info Var -> m String
+spp' = spp . changeInfo NoPos
 
 render :: Doc AnsiStyle -> String
 render = unpack . renderStrict . layoutSmart defaultLayoutOptions

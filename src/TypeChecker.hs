@@ -38,41 +38,41 @@ tc (V p (Free n)) bs = case lookup n bs of
 tc (V p (Global n)) bs = case lookup n bs of
   Nothing -> failPosFD4 p $ "Variable no declarada " ++ ppName n
   Just ty -> return ty
-tc (Const _ (CNat n)) _ = return NatTy
-tc (Print p str t) bs = do
+tc (Const _ (CNat _)) _ = return NatTy
+tc (Print _ _ t) bs = do
   ty <- tc t bs
   expect NatTy ty t
-tc (IfZ p c t t') bs = do
+tc (IfZ _ c t t') bs = do
   tyc <- tc c bs
   expect NatTy tyc c
   tyt <- tc t bs
   tyt' <- tc t' bs
   expect tyt tyt' t'
-tc (Lam p v ty t) bs = do
+tc (Lam _ v ty t) bs = do
   ty' <- tc (open v t) ((v, ty) : bs)
   return (FunTy ty ty')
-tc (App p t u) bs = do
+tc (App _ t u) bs = do
   tyt <- tc t bs
-  (dom, cod) <- domCod t tyt
+  (domm, codd) <- domCod t tyt
   tyu <- tc u bs
-  expect dom tyu u
-  return cod
+  expect domm tyu u
+  return codd
 tc (Fix p f fty x xty t) bs = do
-  (dom, cod) <- domCod (V p (Free f)) fty
-  when (dom /= xty) $ do
+  (domm, codd) <- domCod (V p (Free f)) fty
+  when (domm /= xty) $ do
     failPosFD4
       p
       "El tipo del argumento de un fixpoint debe coincidir con el \
       \dominio del tipo de la función"
   let t' = openN [f, x] t
   ty' <- tc t' ((x, xty) : (f, fty) : bs)
-  expect cod ty' t'
+  expect codd ty' t'
   return fty
-tc (Let p v ty def t) bs = do
+tc (Let _ v ty def t) bs = do
   ty' <- tc def bs
   expect ty ty' def
   tc (open v t) ((v, ty) : bs)
-tc (BinaryOp p op t u) bs = do
+tc (BinaryOp _ _ t u) bs = do
   tty <- tc t bs
   expect NatTy tty t
   uty <- tc t bs
@@ -113,8 +113,8 @@ expect ty ty' t =
 -- | 'domCod chequea que un tipo sea función
 -- | devuelve un par con el tipo del dominio y el codominio de la función
 domCod :: MonadFD4 m => Term -> Ty -> m (Ty, Ty)
-domCod t (FunTy d c) = return (d, c)
-domCod t (NameTy n ty) = domCod t ty
+domCod _ (FunTy d c) = return (d, c)
+domCod t (NameTy _ ty) = domCod t ty
 domCod t ty = typeError t $ "Se esperaba un tipo función, pero se obtuvo: " ++ ppTy ty
 
 -- | 'tcDecl' chequea el tipo de una declaración
@@ -150,67 +150,71 @@ tcTy ::
   [Ty] ->
   -- | tipo del término y término transformado
   m (Ty, TTerm)
-tcTy (V _ var@(Bound k)) _ ts = let ty = ts !! k in return $ (ty, TV var ty)
+tcTy (V _ var@(Bound k)) _ ts = let ty = ts !! k in return $ (ty, V ty var)
 tcTy (V p var@(Free n)) bs _ = case lookup n bs of
   Nothing -> failPosFD4 p $ "Variable no declarada " ++ ppName n
-  Just ty -> return (ty, TV var ty)
+  Just ty -> return (ty, V ty var)
 tcTy (V p var@(Global n)) bs _ = case lookup n bs of
   Nothing -> failPosFD4 p $ "Variable no declarada " ++ ppName n
-  Just ty -> return (ty, TV var ty)
-tcTy (Const _ k@(CNat n)) _ _ = return (NatTy, TConst k NatTy)
-tcTy (Print p str t) bs ts = do
+  Just ty -> return (ty, V ty var)
+tcTy (Const _ k@(CNat _)) _ _ = return (NatTy, Const NatTy k)
+tcTy (Print _ str t) bs ts = do
   (ty, t') <- tcTy t bs ts
-  expect NatTy ty t 
-  return (ty,TPrint str t' ty)
-tcTy (IfZ p c t t') bs ts = do
-  (tyc, ttmC)<- tcTy c bs ts
+  expect NatTy ty t
+  return (ty, Print ty str t')
+tcTy (IfZ _ c t t') bs ts = do
+  (tyc, ttmC) <- tcTy c bs ts
   expect NatTy tyc c
-  (tyt,ttmT)<- tcTy t bs ts
-  (tyt',ttmT') <- tcTy t' bs ts
-  expect tyt tyt' t' 
-  return (tyt, TIfZ ttmC ttmT ttmT' tyt) 
-tcTy (Lam p v ty t) bs ts = do
-  (ty',t') <- tcTy t bs (ty:ts) -- No abre terminos
-  return (FunTy ty ty', TLam v ty t' (FunTy ty ty'))
-tcTy (App p t u) bs ts = do
+  (tyt, ttmT) <- tcTy t bs ts
+  (tyt', ttmT') <- tcTy t' bs ts
+  expect tyt tyt' t'
+  return (tyt, IfZ tyt ttmC ttmT ttmT')
+tcTy (Lam _ v ty t) bs ts = do
+  (ty', t') <- tcTy t bs (ty : ts)
+  let newTy = FunTy ty ty'
+  return (newTy, Lam newTy v ty t')
+tcTy (App _ t u) bs ts = do
   (tyt, t') <- tcTy t bs ts
-  (dom, cod) <- domCod t tyt
+  (domm, codd) <- domCod t tyt
   (tyu, u') <- tcTy u bs ts
-  expect dom tyu u 
-  return (cod, TApp t' u' dom cod)
+  expect domm tyu u
+  return (codd, App tyt t' u')
 tcTy (Fix p f fty x xty t) bs ts = do
-  (dom, cod) <- domCod (V p (Free f)) fty
-  when (dom /= xty) $ do
+  (domm, codd) <- domCod (V p (Free f)) fty
+  when (domm /= xty) $ do
     failPosFD4
       p
       "El tipo del argumento de un fixpoint debe coincidir con el \
       \dominio del tipo de la función"
-  (ty',t') <- tcTy t bs (xty:fty:ts)
-  expect cod ty' t
-  return (fty, TFix f fty x xty t' fty)
-tcTy (Let p v ty def t) bs ts = do
+  (ty', t') <- tcTy t bs (xty : fty : ts)
+  expect codd ty' t
+  return (fty, Fix fty f fty x xty t')
+tcTy (Let _ v ty def t) bs ts = do
   (ty', t') <- tcTy def bs ts
   expect ty ty' def
-  (ty'', t'') <- tcTy t bs (ty:ts)
-  return $ (ty'', TLet v ty t' t'' ty'')
-tcTy (BinaryOp p op t u) bs ts = do
+  (ty'', t'') <- tcTy t bs (ty : ts)
+  return $ (ty'', Let ty'' v ty t' t'')
+tcTy (BinaryOp _ op t u) bs ts = do
   (tty, t') <- tcTy t bs ts
   expect NatTy tty t
   (uty, u') <- tcTy u bs ts
   expect NatTy uty u
-  return $ (NatTy, TBinaryOp op t' u' NatTy)
+  return $ (NatTy, BinaryOp NatTy op t' u')
+
+changeCod :: Ty -> Ty -> Ty
+changeCod (FunTy d _) t = FunTy d t
+changeCod _ _ = undefined
 
 changeTy :: TTerm -> Ty -> TTerm
-changeTy (TV var _) t = TV var t
-changeTy (TConst c _) t = TConst c t
-changeTy (TLam n ty tm _) t = TLam n ty tm t
-changeTy (TApp tm1 tm2 ty _) t = TApp tm1 tm2 ty t
-changeTy (TPrint str tm _) t = TPrint str tm t
-changeTy (TBinaryOp bop tm1 tm2 _) t = TBinaryOp bop tm1 tm2 t
-changeTy (TFix f fTy var varTy tm _) t = TFix f fTy var varTy tm t 
-changeTy (TIfZ tmb tmt tmf _) t = TIfZ tmb tmt tmf t
-changeTy (TLet name ty tm tm' _) t = TLet name ty tm tm' t 
-
+changeTy (V _ var) t = V t var
+changeTy (Const _ c) t = Const t c
+changeTy (Lam _ n ty tm) t = Lam t n ty tm
+changeTy (App ty tm1 tm2) t = let nT = changeCod ty t in App nT tm1 tm2
+changeTy (Print _ str tm) t = Print t str tm
+changeTy (BinaryOp _ bop tm1 tm2) t = BinaryOp t bop tm1 tm2
+changeTy (Fix _ f fTy var varTy tm) t = Fix t f fTy var varTy tm
+changeTy (IfZ _ tmb tmt tmf) t = IfZ t tmb tmt tmf
+changeTy (Let _ name ty tm tm') t = Let t name ty tm tm'
 
 tcDeclTy :: MonadFD4 m => Decl Term -> m (Decl TTerm)
 tcDeclTy (DeclFun p n t def) = do
@@ -220,10 +224,10 @@ tcDeclTy (DeclFun p n t def) = do
     Nothing -> do
       --no está declarado
       s <- get
-      (ty,def') <- tcTy def (tyEnv s) []
+      (ty, def') <- tcTy def (tyEnv s) []
       expect t ty def -- Agregado por nosotros, espera el type de la decl
       addTy n ty
       let deff = changeTy def' t
-      return $ DeclFun p n t deff 
+      return $ DeclFun p n t deff
     Just _ -> failPosFD4 p $ n ++ " ya está declarado"
 tcDeclTy _ = undefined
