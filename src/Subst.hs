@@ -15,7 +15,11 @@ import Data.List (elemIndex)
 import Lang
 
 varChanger ::
-  (Int -> info -> Name -> Tm info Var) -> --que hacemos con las variables localmente libres
+  ( Int ->
+    info ->
+    Name ->
+    Tm info Var --que hacemos con las variables localmente libres
+  ) ->
   (Int -> info -> Int -> Tm info Var) -> --que hacemos con los indices de De Bruijn
   Tm info Var ->
   Tm info Var
@@ -42,10 +46,11 @@ openN ns = varChanger (\_ p n -> V p (Free n)) bnd
   where
     bnd depth p i
       | i < depth = V p (Bound i)
-      | i >= depth && i < depth + nns =
-        V p (Free (nsr !! (i - depth)))
+      | i >= depth && i < depth + nns = V p (Free (nsr !! (i - depth)))
       | otherwise = abort "openN: M is not LC"
+
     nns = length ns
+
     nsr = reverse ns
 
 -- `closeN [nn,..,n0] t` es la operación inversa a open. Reemplaza
@@ -53,10 +58,10 @@ openN ns = varChanger (\_ p n -> V p (Free n)) bnd
 closeN :: [Name] -> Tm info Var -> Tm info Var
 closeN ns = varChanger lcl (\_ p i -> V p (Bound i))
   where
-    lcl depth p y =
-      case elemIndex y nsr of
-        Just i -> V p (Bound (i + depth))
-        Nothing -> V p (Free y)
+    lcl depth p y = case elemIndex y nsr of
+      Just i -> V p (Bound (i + depth))
+      Nothing -> V p (Free y)
+
     nsr = reverse ns
 
 -- `substN [tn,..,t0] t` sustituye los índices de de Bruijn en t con
@@ -77,14 +82,14 @@ substN ns = varChanger (\_ p n -> V p (Free n)) bnd
   where
     bnd depth p i
       | i < depth = V p (Bound i)
-      | i >= depth && i < depth + nns =
-        nsr !! (i - depth)
+      | i >= depth && i < depth + nns = nsr !! (i - depth)
       | otherwise = abort "substN: M is not LC"
+
     nns = length ns
+
     nsr = reverse ns
 
 -- Algunas definiciones auxiliares:
-
 subst' :: Tm info Var -> Tm info Var -> Tm info Var
 subst' ns = varChanger (\_ p n -> V p (Free n)) bnd
   where
@@ -108,3 +113,6 @@ g2f x = x
 
 global2Free :: Tm info Var -> Tm info Var
 global2Free = fmap g2f
+
+subBound :: Tm info Var -> Tm info Var
+subBound = varChanger (\_ p n -> V p (Free n)) (\_ p i -> V p (Bound $ i - 1))

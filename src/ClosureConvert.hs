@@ -16,9 +16,14 @@ generateName n = do
   return $ n ++ show k
 
 makeLet :: Ir -> Name -> [(Name, Ty)] -> Bool -> Ir
-makeLet tm name xs False = foldr (\((x, ty), y) r -> IrLet x (IrAccess (IrVar name) y) r ty) tm (zip xs [1 ..])
+makeLet tm name xs False =
+  foldr
+    (\((x, ty), y) r -> IrLet x (IrAccess (IrVar name) y) r ty)
+    tm
+    (zip xs [1 ..])
 makeLet tm _ [] True = tm
-makeLet tm name ((x, ty) : xs) True = IrLet x (IrVar name) (makeLet tm name xs False) ty
+makeLet tm name ((x, ty) : xs) True =
+  IrLet x (IrVar name) (makeLet tm name xs False) ty
 
 closureConvert :: TTerm -> StateT (Int, [(Name, Ty)]) (Writer [IrDecl]) Ir
 closureConvert (V _ var) = case var of
@@ -49,7 +54,12 @@ closureConvert (App ty tm1 tm2) = do
   itm2 <- closureConvert tm2
   fname <- generateName "t"
   let newdef = IrVar fname
-  return $ IrLet fname itm1 (IrCall (IrAccess newdef 0) [(newdef, Nothing), (itm2, Just tyDom)] tyCod) (FunTy tyDom tyCod)
+  return $
+    IrLet
+      fname
+      itm1
+      (IrCall (IrAccess newdef 0) [(newdef, Nothing), (itm2, Just tyDom)] tyCod)
+      (FunTy tyDom tyCod)
 closureConvert (Print ty str tm) = do
   itm <- closureConvert tm
   pname <- generateName "p"
@@ -92,7 +102,9 @@ runCC n (decl : xs) = case decl of
      in (IrType name ty) : y
   DeclFun _ name ty tt ->
     let freevars = freeVarsInfo tt
-        ((ir, (k, _)), xx) = runWriter $ runStateT (closureConvert tt) (n, freevars)
+        ((ir, (k, _)), xx) =
+          runWriter $
+            runStateT (closureConvert tt) (n, freevars)
         y = runCC k xs
      in (IrVal name ir ty) : xx ++ y
 

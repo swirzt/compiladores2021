@@ -27,7 +27,10 @@ type Bytecode = [Opcode]
 
 newtype Bytecode32 = BC {un32 :: [Word32]}
 
-data Val = I Int | Fun Env Bytecode | RA Env Bytecode
+data Val
+  = I Int
+  | Fun Env Bytecode
+  | RA Env Bytecode
 
 type Env = [Val]
 
@@ -36,17 +39,17 @@ type Stack = [Val]
 {- Esta instancia explica como codificar y decodificar Bytecode de 32 bits -}
 instance Binary Bytecode32 where
   put (BC bs) = mapM_ putWord32le bs
+
   get = go
     where
-      go =
-        do
-          empty <- isEmpty
-          if empty
-            then return $ BC []
-            else do
-              x <- getWord32le
-              BC xs <- go
-              return $ BC (x : xs)
+      go = do
+        empty <- isEmpty
+        if empty
+          then return $ BC []
+          else do
+            x <- getWord32le
+            BC xs <- go
+            return $ BC (x : xs)
 
 {- Estos sinónimos de patrón nos permiten escribir y hacer
 pattern-matching sobre el nombre de la operación en lugar del código
@@ -213,7 +216,9 @@ runBC' (PRINTN : c) e st@(I n : _) = do
   runBC' c e st
 runBC' (PRINTN : _) _ _ = failFD4 "Error al ejecutar PRINTN"
 runBC' (PRINT : c) e s = printStr c e s
-runBC' (FIX : c) e (Fun _ cf : s) = let efix = Fun efix cf : e in runBC' c e (Fun efix cf : s)
+runBC' (FIX : c) e (Fun _ cf : s) =
+  let efix = Fun efix cf : e
+   in runBC' c e (Fun efix cf : s)
 runBC' (FIX : _) _ _ = failFD4 "Error al ejecutar FIX"
 runBC' (STOP : _) _ _ = return ()
 runBC' (IFZ : tLen : c) e (I n : s) =

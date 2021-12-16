@@ -5,10 +5,14 @@ import Lang
 import MonadFD4
 import Prelude
 
-data Val = Num Int | Clos ClosCEK
+data Val
+  = Num Int
+  | Clos ClosCEK
   deriving (Show)
 
-data ClosCEK = ClosFun Env Term Term | ClosFix Env Term Term --El segundo Term es para reconstruir la funcion
+data ClosCEK
+  = ClosFun Env Term Term
+  | ClosFix Env Term Term --El segundo Term es para reconstruir la funcion
   deriving (Show)
 
 type Env = [Val]
@@ -35,7 +39,8 @@ search (V info (Global i)) env kont = do
   val <- lookupDecl i
   case val of
     Just x -> search x env kont
-    Nothing -> failPosFD4 info "Error al evaluar el marco de V, variable indefinida"
+    Nothing ->
+      failPosFD4 info "Error al evaluar el marco de V, variable indefinida"
 search (Const _ (CNat c)) _ kont = destroy (Num c) kont
 search f@(Lam _ _ _ _) env kont = destroy (Clos $ close f env) kont
 search f@(Fix _ _ _ _ _ _) env kont = destroy (Clos $ close f env) kont

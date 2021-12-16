@@ -5,14 +5,7 @@
 -- License     : GPL-3
 -- Maintainer  : mauro@fceia.unr.edu.ar
 -- Stability   : experimental
-module TypeChecker
-  ( tc,
-    tcDecl,
-    tcTy,
-    tcDeclTy,
-    domCod,
-  )
-where
+module TypeChecker (tc, tcDecl, tcTy, tcDeclTy, domCod) where
 
 import Global
 import Lang
@@ -23,15 +16,9 @@ import Subst
 -- | 'tc' chequea y devuelve el tipo de un término
 -- Si el término no está bien tipado, lanza un error
 -- usando la interfaz de las mónadas @MonadFD4@.
-tc ::
-  MonadFD4 m =>
-  -- | término a chequear
-  Term ->
-  -- | entorno de tipado
-  [(Name, Ty)] ->
-  -- | tipo del término
-  m Ty
-tc (V p (Bound _)) _ = failPosFD4 p "typecheck: No deberia haber variables Bound"
+tc :: MonadFD4 m => Term -> [(Name, Ty)] -> m Ty
+tc (V p (Bound _)) _ =
+  failPosFD4 p "typecheck: No deberia haber variables Bound"
 tc (V p (Free n)) bs = case lookup n bs of
   Nothing -> failPosFD4 p $ "Variable no declarada " ++ ppName n
   Just ty -> return ty
@@ -59,11 +46,12 @@ tc (App _ t u) bs = do
   return codd
 tc (Fix p f fty x xty t) bs = do
   (domm, codd) <- domCod (V p (Free f)) fty
-  when (domm /= xty) $ do
-    failPosFD4
-      p
-      "El tipo del argumento de un fixpoint debe coincidir con el \
-      \dominio del tipo de la función"
+  when (domm /= xty) $
+    do
+      failPosFD4
+        p
+        "El tipo del argumento de un fixpoint debe coincidir con el \
+        \dominio del tipo de la función"
   let t' = openN [f, x] t
   ty' <- tc t' ((x, xty) : (f, fty) : bs)
   expect codd ty' t'
@@ -79,43 +67,28 @@ tc (BinaryOp _ _ t u) bs = do
   expect NatTy uty u
 
 -- | @'typeError' t s@ lanza un error de tipo para el término @t@
-typeError ::
-  MonadFD4 m =>
-  -- | término que se está chequeando
-  Term ->
-  -- | mensaje de error
-  String ->
-  m a
+typeError :: MonadFD4 m => Term -> String -> m a
 typeError t s = do
   ppt <- pp t
   failPosFD4 (getInfo t) $ "Error de tipo en " ++ ppt ++ "\n" ++ s
 
 -- | 'expect' chequea que el tipo esperado sea igual al que se obtuvo
 -- y lanza un error si no lo es.
-expect ::
-  MonadFD4 m =>
-  -- | tipo esperado
-  Ty ->
-  -- | tipo que se obtuvo
-  Ty ->
-  -- | término que se está chequeando
-  Term ->
-  m Ty
+expect :: MonadFD4 m => Ty -> Ty -> Term -> m Ty
 expect ty ty' t =
   if ty == ty'
     then return ty
     else
       typeError t $
-        "Tipo esperado: " ++ ppTy ty
-          ++ "\npero se obtuvo: "
-          ++ ppTy ty'
+        "Tipo esperado: " ++ ppTy ty ++ "\npero se obtuvo: " ++ ppTy ty'
 
 -- | 'domCod chequea que un tipo sea función
 -- | devuelve un par con el tipo del dominio y el codominio de la función
 domCod :: MonadFD4 m => Term -> Ty -> m (Ty, Ty)
 domCod _ (FunTy d c) = return (d, c)
 domCod t (NameTy _ ty) = domCod t ty
-domCod t ty = typeError t $ "Se esperaba un tipo función, pero se obtuvo: " ++ ppTy ty
+domCod t ty =
+  typeError t $ "Se esperaba un tipo función, pero se obtuvo: " ++ ppTy ty
 
 -- | 'tcDecl' chequea el tipo de una declaración
 -- y la agrega al entorno de tipado de declaraciones globales
@@ -138,19 +111,11 @@ tcDecl (DeclType p n t) = do
     Just _ -> failPosFD4 p $ n ++ " ya está declarado"
 
 --Funciones para compilar a C
-
 --Funciona como tc pero tambien devuelve el termino como TTerm
-tcTy ::
-  MonadFD4 m =>
-  -- | término a chequear
-  Term ->
-  -- | entorno de tipado
-  [(Name, Ty)] ->
-  -- | tipos de los Bound
-  [Ty] ->
-  -- | tipo del término y término transformado
-  m (Ty, TTerm)
-tcTy (V _ var@(Bound k)) _ ts = let ty = ts !! k in return $ (ty, V ty var)
+tcTy :: MonadFD4 m => Term -> [(Name, Ty)] -> [Ty] -> m (Ty, TTerm)
+tcTy (V _ var@(Bound k)) _ ts =
+  let ty = ts !! k
+   in return $ (ty, V ty var)
 tcTy (V p var@(Free n)) bs _ = case lookup n bs of
   Nothing -> failPosFD4 p $ "Variable no declarada " ++ ppName n
   Just ty -> return (ty, V ty var)
@@ -181,11 +146,12 @@ tcTy (App _ t u) bs ts = do
   return (codd, App tyt t' u')
 tcTy (Fix p f fty x xty t) bs ts = do
   (domm, codd) <- domCod (V p (Free f)) fty
-  when (domm /= xty) $ do
-    failPosFD4
-      p
-      "El tipo del argumento de un fixpoint debe coincidir con el \
-      \dominio del tipo de la función"
+  when (domm /= xty) $
+    do
+      failPosFD4
+        p
+        "El tipo del argumento de un fixpoint debe coincidir con el \
+        \dominio del tipo de la función"
   (ty', t') <- tcTy t bs (xty : fty : ts)
   expect codd ty' t
   return (fty, Fix fty f fty x xty t')
@@ -209,7 +175,9 @@ changeTy :: TTerm -> Ty -> TTerm
 changeTy (V _ var) t = V t var
 changeTy (Const _ c) t = Const t c
 changeTy (Lam _ n ty tm) t = Lam t n ty tm
-changeTy (App ty tm1 tm2) t = let nT = changeCod ty t in App nT tm1 tm2
+changeTy (App ty tm1 tm2) t =
+  let nT = changeCod ty t
+   in App nT tm1 tm2
 changeTy (Print _ str tm) t = Print t str tm
 changeTy (BinaryOp _ bop tm1 tm2) t = BinaryOp t bop tm1 tm2
 changeTy (Fix _ f fTy var varTy tm) t = Fix t f fTy var varTy tm

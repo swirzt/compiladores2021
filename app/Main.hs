@@ -50,7 +50,9 @@ parseMode =
 
 -- | Parser de opciones general, consiste de un modo y una lista de archivos a procesar
 parseArgs :: Parser (Mode, Bool, [FilePath])
-parseArgs = (\(a, b) c -> (a, b, c)) <$> parseMode <*> many (argument str (metavar "FILES..."))
+parseArgs =
+  (\(a, b) c -> (a, b, c)) <$> parseMode
+    <*> many (argument str (metavar "FILES..."))
 
 main :: IO ()
 main = execParser opts >>= go
@@ -62,21 +64,18 @@ main = execParser opts >>= go
             <> progDesc "Compilador de FD4"
             <> header "Compilador de FD4 de la materia Compiladores 2021"
         )
+
     go :: (Mode, Bool, [FilePath]) -> IO ()
     go (Interactive, opt, files) =
       runFD4 opt (Just Interactive) (runInputT defaultSettings (repl files))
         >> return ()
-    go (Typecheck, opt, files) =
-      runOrFail opt $ mapM_ typecheckFile files
+    go (Typecheck, opt, files) = runOrFail opt $ mapM_ typecheckFile files
     go (InteractiveCEK, opt, files) =
       runFD4 opt (Just InteractiveCEK) (runInputT defaultSettings (repl files))
         >> return ()
-    go (Bytecompile, opt, files) =
-      runOrFail opt $ mapM_ bytecompileFile files
-    go (RunVM, _, files) =
-      runOrFail False $ mapM_ bytecodeRun files
-    go (CC, opt, files) =
-      runOrFail opt $ mapM_ ccFile files
+    go (Bytecompile, opt, files) = runOrFail opt $ mapM_ bytecompileFile files
+    go (RunVM, _, files) = runOrFail False $ mapM_ bytecodeRun files
+    go (CC, opt, files) = runOrFail opt $ mapM_ ccFile files
 
 runOrFail :: Bool -> FD4 a -> IO a
 runOrFail b m = do
@@ -94,9 +93,7 @@ repl args = do
   when (inter s) $
     liftIO $
       putStrLn
-        ( "Entorno interactivo para FD4.\n"
-            ++ "Escriba :? para recibir ayuda."
-        )
+        ("Entorno interactivo para FD4.\n" ++ "Escriba :? para recibir ayuda.")
   loop
   where
     loop = do
@@ -125,7 +122,9 @@ loadFile f = do
         (readFile filename)
         ( \e -> do
             let err = show (e :: IOException)
-            hPutStrLn stderr ("No se pudo abrir el archivo " ++ filename ++ ": " ++ err)
+            hPutStrLn
+              stderr
+              ("No se pudo abrir el archivo " ++ filename ++ ": " ++ err)
             return ""
         )
   setLastFile filename
@@ -141,13 +140,19 @@ compileFile f = do
         (readFile filename)
         ( \e -> do
             let err = show (e :: IOException)
-            hPutStrLn stderr ("No se pudo abrir el archivo " ++ filename ++ ": " ++ err)
+            hPutStrLn
+              stderr
+              ("No se pudo abrir el archivo " ++ filename ++ ": " ++ err)
             return ""
         )
   decls <- parseIO filename program x
   mapM_ handleDecl decls
 
-fmapM :: (MonadFD4 m, Show info, Eq info) => (Tm info var -> m (Tm info var)) -> Decl (Tm info var) -> m (Decl (Tm info var))
+fmapM ::
+  (MonadFD4 m, Show info, Eq info) =>
+  (Tm info var -> m (Tm info var)) ->
+  Decl (Tm info var) ->
+  m (Decl (Tm info var))
 fmapM _ d@(DeclType _ _ _) = return d
 fmapM f (DeclFun i n t term) = do
   term' <- f term
@@ -192,7 +197,10 @@ handleDecl :: MonadFD4 m => SDecl STerm -> m ()
 handleDecl d = do
   output <- typecheckDecl d
   opt <- getOpti
-  let f = if opt then optimize optIter else return
+  let f =
+        if opt
+          then optimize optIter
+          else return
   output' <- fmapM f output
   case output' of
     DeclFun p n ty tt -> do
@@ -227,10 +235,14 @@ interpretCommand x =
       let matching = filter (\(Cmd cs _ _ _) -> any (isPrefixOf cmd) cs) commands
       case matching of
         [] -> do
-          putStrLn ("Comando desconocido `" ++ cmd ++ "'. Escriba :? para recibir ayuda.")
+          putStrLn
+            ( "Comando desconocido `"
+                ++ cmd
+                ++ "'. Escriba :? para recibir ayuda."
+            )
           return Noop
-        [Cmd _ _ f _] ->
-          do return (f t)
+        [Cmd _ _ f _] -> do
+          return (f t)
         _ -> do
           putStrLn
             ( "Comando ambigüo, podría ser "
@@ -248,8 +260,16 @@ commands =
       "<file>"
       (Compile . CompileFile)
       "Cargar un programa desde un archivo",
-    Cmd [":print"] "<exp>" PPrint "Imprime un término y sus ASTs sin evaluarlo",
-    Cmd [":reload"] "" (const Reload) "Vuelve a cargar el último archivo cargado",
+    Cmd
+      [":print"]
+      "<exp>"
+      PPrint
+      "Imprime un término y sus ASTs sin evaluarlo",
+    Cmd
+      [":reload"]
+      ""
+      (const Reload)
+      "Vuelve a cargar el último archivo cargado",
     Cmd [":type"] "<exp>" Type "Chequea el tipo de una expresión",
     Cmd [":quit", ":Q"] "" (const Quit) "Salir del intérprete",
     Cmd [":help", ":?"] "" (const Help) "Mostrar esta lista de comandos"
@@ -282,13 +302,15 @@ handleCommand cmd = do
     Browse -> do
       printFD4 (unlines [name | name <- reverse (nub (map declName glb))])
       return True
-    Compile c ->
-      do
-        case c of
-          CompileInteractive e -> compilePhrase e
-          CompileFile f -> put (s {lfile = f, cantDecl = 0}) >> compileFile f
-        return True
-    Reload -> eraseLastFileDecls >> getLastFile >>= compileFile >> return True
+    Compile c -> do
+      case c of
+        CompileInteractive e -> compilePhrase e
+        CompileFile f ->
+          put (s {lfile = f, cantDecl = 0})
+            >> compileFile f
+      return True
+    Reload ->
+      eraseLastFileDecls >> getLastFile >>= compileFile >> return True
     PPrint e -> printPhrase e >> return True
     Type e -> typeCheckPhrase e >> return True
 
@@ -310,21 +332,20 @@ handleTerm t f = do
   s <- get
   ty <- tc elabTerm (tyEnv s)
   te <- f elabTerm
-  ppte <- pp te
-  printFD4 (ppte ++ " : " ++ ppTy ty)
+  ppte <- spp te
+  printFD4 (ppte ++ " : " ++ ppSTy ty)
 
 printPhrase :: MonadFD4 m => String -> m ()
-printPhrase x =
-  do
-    x' <- parseIO "<interactive>" tm x
-    ex <- elab x'
-    t <- case x' of
-      (SV _ f) -> maybe ex id <$> lookupDecl f
-      _ -> return ex
-    printFD4 "STerm:"
-    printFD4 (show x')
-    printFD4 "\nTerm:"
-    printFD4 (show t)
+printPhrase x = do
+  x' <- parseIO "<interactive>" tm x
+  ex <- elab x'
+  t <- case x' of
+    (SV _ f) -> maybe ex id <$> lookupDecl f
+    _ -> return ex
+  printFD4 "STerm:"
+  printFD4 (show x')
+  printFD4 "\nTerm:"
+  printFD4 (show t)
 
 typeCheckPhrase :: MonadFD4 m => String -> m ()
 typeCheckPhrase x = do
@@ -346,7 +367,10 @@ bytecompileFile fp = do
   ys <- mapM typecheckDecl xs
   ys' <- filterM filterSTypes ys
   opt <- getOpti
-  let f = if opt then optimizeDecls optIter else return
+  let f =
+        if opt
+          then optimizeDecls optIter
+          else return
   zs <- f ys'
   byte <- bytecompileModule zs
   liftIO $ bcWrite byte (replaceExtension fp ".o")
@@ -380,9 +404,11 @@ ccFile fp = do
   xs <- loadFile fp
   ys <- mapM typecheckDeclTy xs
   opt <- getOpti
-  let f = if opt then optimize optIter else return
+  let f =
+        if opt
+          then optimize optIter
+          else return
   ys' <- mapM (fmapM f) ys
-  -- printFD4Debug ys'
   let imp = compilaC ys'
   liftIO $ cWrite imp (replaceExtension fp ".c")
   return ()

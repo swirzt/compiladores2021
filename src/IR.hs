@@ -22,15 +22,8 @@ data IrDecl
         irDeclBody :: Ir,
         irDeclTy :: Ty
       }
-  | IrVal
-      { irDeclName :: Name,
-        irDeclDef :: Ir,
-        irDeclTy :: Ty
-      }
-  | IrType
-      { irDeclName :: Name,
-        irDeclTy :: Ty
-      }
+  | IrVal {irDeclName :: Name, irDeclDef :: Ir, irDeclTy :: Ty}
+  | IrType {irDeclName :: Name, irDeclTy :: Ty}
   deriving (Show)
 
 newtype IrDecls = IrDecls {irDecls :: [IrDecl]}
@@ -39,5 +32,4 @@ newtype IrDecls = IrDecls {irDecls :: [IrDecl]}
 La siguiente instancia es sólo para debugging
 -}
 instance Show IrDecls where
-  show (IrDecls decls) =
-    concatMap (\d -> show d ++ "\n") decls
+  show (IrDecls decls) = concatMap (\d -> show d ++ "\n") decls

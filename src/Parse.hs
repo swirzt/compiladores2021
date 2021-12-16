@@ -9,7 +9,6 @@ module Parse (tm, Parse.parse, decl, runP, P, program, declOrTm) where
 
 import Common
 --( GenLanguageDef(..), emptyDef )
-
 import Control.Monad.Identity (Identity)
 import Lang
 import Text.Parsec hiding (parse, runP)
@@ -71,7 +70,6 @@ reservedOp = Tok.reservedOp lexer
 -----------------------
 -- Parsers
 -----------------------
-
 num :: P Int
 num = fromInteger <$> natural
 
@@ -125,11 +123,7 @@ binary :: String -> BinaryOp -> Assoc -> Operator String () Identity STerm
 binary s f = Ex.Infix (reservedOp s >> return (SBinaryOp NoPos f))
 
 table :: [[Operator String () Identity STerm]]
-table =
-  [ [ binary "+" Add Ex.AssocLeft,
-      binary "-" Sub Ex.AssocLeft
-    ]
-  ]
+table = [[binary "+" Add Ex.AssocLeft, binary "-" Sub Ex.AssocLeft]]
 
 expr :: P STerm
 expr = Ex.buildExpressionParser table tm
@@ -175,7 +169,6 @@ binders =
     <|> return []
 
 --Si no anda, sacar el x <. parens binding arafue
-
 lam :: P STerm
 lam = do
   i <- getPos
@@ -271,15 +264,14 @@ letdecl' i b = do
   return (SDeclFun i v mvars ty def b)
 
 letdecl :: Pos -> P (SDecl STerm)
-letdecl i =
-  do
-    reserved "let"
-    try
-      ( do
-          reserved "rec"
-          letdecl' i True
-      )
-      <|> letdecl' i False
+letdecl i = do
+  reserved "let"
+  try
+    ( do
+        reserved "rec"
+        letdecl' i True
+    )
+    <|> letdecl' i False
 
 -- | Parser de programas (listas de declaraciones)
 program :: P [SDecl STerm]

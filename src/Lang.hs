@@ -45,22 +45,15 @@ type Name = String
 newtype Const = CNat Int
   deriving (Show, Eq)
 
-data BinaryOp = Add | Sub
+data BinaryOp
+  = Add
+  | Sub
   deriving (Show, Eq)
 
 -- | tipo de datos de declaraciones, parametrizado por el tipo del cuerpo de la declaración
 data Decl a
-  = DeclType
-      { declPos :: Pos,
-        declName :: Name,
-        declType :: Ty
-      }
-  | DeclFun
-      { declPos :: Pos,
-        declName :: Name,
-        declType :: Ty,
-        declBody :: a
-      }
+  = DeclType {declPos :: Pos, declName :: Name, declType :: Ty}
+  | DeclFun {declPos :: Pos, declName :: Name, declType :: Ty, declBody :: a}
   deriving (Show, Functor)
 
 data SDecl a
@@ -117,8 +110,7 @@ type Term =
   -- | 'Tm' con índices de De Bruijn como variables ligadas, y nombres para libres y globales, guarda posición
   Tm Pos Var
 
-type TTerm =
-  Tm Ty Var
+type TTerm = Tm Ty Var
 
 data Var
   = Bound !Int
@@ -145,9 +137,11 @@ changeInfo i (Lam _ n t tm) = Lam i n t $ changeInfo i tm
 changeInfo i (App _ tm1 tm2) = App i (changeInfo i tm1) (changeInfo i tm2)
 changeInfo i (Print _ str tm) = Print i str $ changeInfo i tm
 changeInfo i (Fix _ fn ft vn vt tm) = Fix i fn ft vn vt $ changeInfo i tm
-changeInfo i (IfZ _ t1 t2 t3) = IfZ i (changeInfo i t1) (changeInfo i t2) (changeInfo i t3)
+changeInfo i (IfZ _ t1 t2 t3) =
+  IfZ i (changeInfo i t1) (changeInfo i t2) (changeInfo i t3)
 changeInfo i (Let _ n t t1 t2) = Let i n t (changeInfo i t1) (changeInfo i t2)
-changeInfo i (BinaryOp _ bop t1 t2) = BinaryOp i bop (changeInfo i t1) (changeInfo i t2)
+changeInfo i (BinaryOp _ bop t1 t2) =
+  BinaryOp i bop (changeInfo i t1) (changeInfo i t2)
 
 -- | Obtiene los nombres de variables (abiertas o globales) de un término.
 freeVars :: Tm info Var -> [Name]

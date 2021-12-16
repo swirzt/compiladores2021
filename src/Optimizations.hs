@@ -3,10 +3,8 @@
 module Optimizations where
 
 import Eval
--- import Global
 import Lang
 import MonadFD4
-import PPrint
 import Subst
 
 -- Constant Folding and Propagation
@@ -35,16 +33,15 @@ pattern BOUND i <- V _ (Bound i)
 
 inlineAndDead :: (MonadFD4 m, Show info, Eq info) => (Tm info Var) -> m (Tm info Var)
 inlineAndDead t@(Let _ _ _ _ (BinaryOp _ _ (BOUND _) (BOUND _))) = return t -- No expandimos porque viene de cse
-inlineAndDead t@(Let info name _ tm1 tm2) = do
+inlineAndDead t@(Let _ name _ tm1 tm2) = do
   let calls = numCall tm2
   let size = termSize tm1
   temporal calls size
   where
     temporal calls size
       | calls == 0 = do
-        stm <- spp' t
-        printFD4 $ "Cuidado: Variable sin usar " ++ name ++ " en el término:\n " ++ stm
-        changeInline tm2
+        printFD4 $ "Cuidado: Definición de let sin usar: " ++ name
+        changeInline (subBound tm2)
       | calls == 1 = changeInline $ subst' tm1 tm2
       | calls > 10 = changeInline $ subst' tm1 tm2
       | otherwise =
@@ -79,13 +76,10 @@ notBound (V _ (Bound _)) = False
 notBound _ = True
 
 cse :: (MonadFD4 m, Show info, Eq info) => (Tm info Var) -> m (Tm info Var)
-cse t@(BinaryOp info bOp tm1 tm2) =
-  if (tm1 == tm2 && notPrint tm1 && notBound tm1)
-    then do
-      var <- getFresh
-      let varname = "cse_" ++ show var
-      changecse $ Let info varname NatTy tm1 (BinaryOp info bOp (V info (Bound 0)) (V info (Bound 0)))
-    else return t
+cse (BinaryOp info bOp tm1 tm2) | notBound tm1 && tm1 == tm2 && notPrint tm1 = do
+  var <- getFresh
+  let varname = "cse_" ++ show var
+  changecse $ Let info varname NatTy tm1 (BinaryOp info bOp (V info (Bound 0)) (V info (Bound 0)))
 cse t = return t
 
 numCall :: (Tm info Var) -> Int
@@ -184,7 +178,7 @@ deadCodeEliminationDecl (x : xs) =
         else modifyOptimized >> deadCodeEliminationDecl xs
 
 replaceGlobal :: Name -> Term -> Term -> Term
-replaceGlobal name tm v@(V _ (Global name')) = if name == name' then tm else v
+replaceGlobal name tm (V _ (Global name')) | name == name' = tm
 replaceGlobal _ _ v@(V _ _) = v
 replaceGlobal _ _ c@(Const _ _) = c
 replaceGlobal name tm (Lam info nn ty tmm) = Lam info nn ty $ replaceGlobal name tm tmm

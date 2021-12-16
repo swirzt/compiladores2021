@@ -104,9 +104,18 @@ eraseLastFileDecls = do
       (fun, typ) = sepByDecl era
       tyEnv' = deleteTy (map declName fun) (tyEnv s)
       typeDefs' = deleteTy (map declName typ) (typeDefs s)
-  modify (\st -> st {glb = remaining, cantDecl = 0, tyEnv = tyEnv', typeDefs = typeDefs'})
+  modify
+    ( \st ->
+        st
+          { glb = remaining,
+            cantDecl = 0,
+            tyEnv = tyEnv',
+            typeDefs = typeDefs'
+          }
+    )
   where
-    deleteTy xs ps = deleteFirstsBy (\x y -> fst x == fst y) ps (map (flip (,) NatTy) xs)
+    deleteTy xs ps =
+      deleteFirstsBy (\x y -> fst x == fst y) ps (map (flip (,) NatTy) xs)
 
 hasName :: Name -> Decl a -> Bool
 hasName nm (DeclFun {declName = nm'}) = nm == nm'
@@ -138,11 +147,7 @@ catchErrors :: MonadFD4 m => m a -> m (Maybe a)
 catchErrors c =
   catchError
     (Just <$> c)
-    ( \e ->
-        liftIO $
-          hPutStrLn stderr (show e)
-            >> return Nothing
-    )
+    (\e -> liftIO $ hPutStrLn stderr (show e) >> return Nothing)
 
 printFD4Char :: MonadFD4 m => Char -> m ()
 printFD4Char = liftIO . putChar
