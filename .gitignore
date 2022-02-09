@@ -2,6 +2,7 @@
 .stack-work
 stack.yaml.lock
 **/*.o
+**/*.byte
 **/*.hi
 *.bin
 *.aux
@@ -12,6 +13,7 @@ stack.yaml.lock
 *.bbl
 compiladores.cabal
 test/*.c
+test/correctos/*.c
 a.out
 .vscode/settings.json
 pepe

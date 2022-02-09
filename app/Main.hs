@@ -373,13 +373,12 @@ bytecompileFile fp = do
           else return
   zs <- f ys'
   byte <- bytecompileModule zs
-  liftIO $ bcWrite byte (replaceExtension fp ".o")
+  liftIO $ bcWrite byte (replaceExtension fp ".byte")
   return ()
 
 bytecodeRun :: MonadFD4 m => FilePath -> m ()
 bytecodeRun fp = do
   file <- liftIO $ bcRead fp
-  printFD4Debug file
   runBC file
 
 -- Para compilar en C

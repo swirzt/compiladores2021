@@ -13,7 +13,7 @@ generateName :: Name -> StateT (Int, [(Name, Ty)]) (Writer [IrDecl]) Name
 generateName n = do
   (k, _) <- get
   modify (\(h, vars) -> (h + 1, vars))
-  return $ n ++ show k
+  return $ "random_" ++ n ++ show k
 
 makeLet :: Ir -> Name -> [(Name, Ty)] -> Bool -> Ir
 makeLet tm name xs False =

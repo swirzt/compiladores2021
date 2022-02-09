@@ -69,7 +69,7 @@ ir2doc (IrBinaryOp Add a b) = ir2doc a <+> pretty "+" <+> ir2doc b
 ir2doc (IrBinaryOp Sub a b) = pretty "fd4_sub" <> tupled [ir2doc a, ir2doc b]
 ir2doc (IrLet n t t' tyL) =
   stmts
-    [ hsep [ty2Doc tyL, name n, pretty "=", ir2doc t]
+    [ hsep [ty2Doc tyL, name n, pretty "=", parens (ty2Doc tyL), ir2doc t]
         <> semi
         <> line
         <> ir2doc t'
