@@ -1,5 +1,6 @@
 **/.*.swp
 .stack-work
+.HTF
 stack.yaml.lock
 **/*.o
 **/*.byte
